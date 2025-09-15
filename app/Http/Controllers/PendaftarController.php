@@ -1,184 +1,162 @@
 <?php
 
-namespace App\Http\Controllers\Admin;
+namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\Pendaftar;
 use App\Models\Beasiswa;
-use App\Models\RejectionHistory;
+use App\Models\Pendaftar;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class PendaftarController extends Controller
 {
-    public function index()
+    public function __construct()
     {
-        $pendaftars = Pendaftar::with('beasiswa')->latest()->paginate(10);
-        return view('admin.pendaftaran.index', compact('pendaftars'));
+        $this->middleware('auth'); // Wajib login
     }
 
-    public function show(Pendaftar $pendaftar)
+    public function create(Beasiswa $beasiswa)
     {
-        // Load rejection history untuk ditampilkan ke admin
-        $rejectionHistories = RejectionHistory::where('pendaftar_id', $pendaftar->id)
-                                            ->orderBy('rejected_at', 'desc')
-                                            ->get();
+        if (!$beasiswa->isActive()) {
+            return redirect()->route('home')
+                           ->with('error', 'Pendaftaran beasiswa sudah ditutup atau tidak aktif.');
+        }
 
-        return view('admin.pendaftaran.show', compact('pendaftar', 'rejectionHistories'));
+        // Cek berdasarkan email user yang login - hanya cek yang statusnya pending atau diterima
+        $existingApplication = Pendaftar::where('email', Auth::user()->email)
+                                      ->whereIn('status', ['pending', 'diterima'])
+                                      ->first();
+
+        if ($existingApplication) {
+            $beasiswaTerdaftar = Beasiswa::find($existingApplication->beasiswa_id);
+            $statusText = $existingApplication->status == 'pending' ? 'sedang menunggu verifikasi' : 'telah diterima';
+
+            return redirect()->route('home')
+                           ->with('error', 'Anda sudah terdaftar di beasiswa "' . $beasiswaTerdaftar->nama_beasiswa . '" dan ' . $statusText . '.');
+        }
+
+        return view('pendaftaran.create', compact('beasiswa'));
     }
 
-    public function updateStatus(Request $request, Pendaftar $pendaftar)
+    public function store(Request $request, Beasiswa $beasiswa)
     {
+        if (!$beasiswa->isActive()) {
+            return redirect()->route('home')
+                           ->with('error', 'Pendaftaran beasiswa sudah ditutup atau tidak aktif.');
+        }
+
+        // Base validation rules
         $rules = [
-            'status' => 'required|in:pending,diterima,ditolak'
+            'nama_lengkap' => 'required|string|max:255',
+            'nim' => [
+                'required',
+                'string',
+                'max:20',
+                Rule::unique('pendaftars', 'nim')->where(function ($query) {
+                    return $query->whereIn('status', ['pending', 'diterima'])
+                                 ->where('email', '!=', Auth::user()->email);
+                })
+            ],
+            'email' => 'required|email|max:255',
+            'no_hp' => 'required|string|max:15',
+            'fakultas' => 'required|string|max:255',
+            'jurusan' => 'required|string|max:255',
+            'semester' => 'required|integer|min:1|max:14',
+            'ipk' => 'required|numeric|min:0|max:4',
+            'alasan_mendaftar' => 'required|string',
         ];
 
-        // Jika status ditolak, tambah validasi untuk rejection fields
-        if ($request->status === 'ditolak') {
-            $rules['rejection_reason'] = 'required|string|min:10|max:1000';
-            $rules['can_resubmit'] = 'required|boolean';
+        // Add dynamic document validation rules
+        $documentRules = $beasiswa->getDocumentValidationRules();
+        $rules = array_merge($rules, $documentRules);
+
+        // Custom error messages
+        $messages = [
+            'nim.unique' => 'NIM ini sedang digunakan oleh pendaftar lain dalam beasiswa yang masih aktif.',
+        ];
+
+        // Add dynamic document validation messages
+        $documentMessages = $beasiswa->getDocumentValidationMessages();
+        $messages = array_merge($messages, $documentMessages);
+
+        $validated = $request->validate($rules, $messages);
+
+        // Pastikan email sama dengan email user yang login
+        if ($validated['email'] !== Auth::user()->email) {
+            return redirect()->back()
+                           ->withInput()
+                           ->with('error', 'Email harus sama dengan email akun Anda.');
         }
 
-        $validated = $request->validate($rules, [
-            'rejection_reason.required' => 'Alasan penolakan wajib diisi',
-            'rejection_reason.min' => 'Alasan penolakan minimal 10 karakter',
-            'rejection_reason.max' => 'Alasan penolakan maksimal 1000 karakter',
-            'can_resubmit.required' => 'Pilihan dapat submit ulang wajib dipilih',
-        ]);
+        // Double check - hanya cek yang statusnya pending atau diterima (berdasarkan email)
+        $existingApplicationByEmail = Pendaftar::where('email', Auth::user()->email)
+                                              ->whereIn('status', ['pending', 'diterima'])
+                                              ->first();
 
-        // Jika status berubah dari apapun ke ditolak
-        if ($validated['status'] === 'ditolak') {
-            // Simpan ke history sebelum update
-            RejectionHistory::create([
-                'pendaftar_id' => $pendaftar->id,
-                'rejection_reason' => $validated['rejection_reason'],
-                'can_resubmit' => $validated['can_resubmit'],
-                'rejected_by' => Auth::user()->email ?? 'admin',
-                'rejected_at' => now(),
-            ]);
-
-            // Update pendaftar dengan data rejection
-            $pendaftar->update([
-                'status' => 'ditolak',
-                'rejection_reason' => $validated['rejection_reason'],
-                'can_resubmit' => $validated['can_resubmit'],
-                'rejected_at' => now(),
-            ]);
-
-            $message = 'Status pendaftar berhasil diupdate menjadi ditolak!';
-
-        } else {
-            // Jika status bukan ditolak, clear rejection fields
-            $updateData = [
-                'status' => $validated['status'],
-                'rejection_reason' => null,
-                'can_resubmit' => false,
-                'rejected_at' => null,
-            ];
-
-            $pendaftar->update($updateData);
-
-            $statusText = $validated['status'] === 'pending' ? 'pending' : 'diterima';
-            $message = "Status pendaftar berhasil diupdate menjadi {$statusText}!";
+        if ($existingApplicationByEmail) {
+            return redirect()->route('home')
+                           ->with('error', 'Anda masih memiliki beasiswa yang aktif.');
         }
 
-        return redirect()->back()->with('success', $message);
-    }
+        // Upload and store documents
+        $uploadedDocuments = [];
+        foreach ($beasiswa->required_documents as $document) {
+            $key = $document['key'];
 
-    public function destroy(Pendaftar $pendaftar)
-    {
-        // Hapus semua file dokumen yang diupload
-        if ($pendaftar->uploaded_documents && is_array($pendaftar->uploaded_documents)) {
-            foreach ($pendaftar->uploaded_documents as $key => $filename) {
-                if ($filename) {
-                    Storage::delete('public/documents/' . $filename);
-                }
+            if ($request->hasFile($key)) {
+                $file = $request->file($key);
+                $fileName = time() . '_' . $key . '_' . $file->getClientOriginalName();
+                $file->storeAs('public/documents', $fileName);
+                $uploadedDocuments[$key] = $fileName;
             }
         }
 
-        // Hapus juga file legacy jika ada (untuk backward compatibility)
-        $legacyFiles = ['file_transkrip', 'file_ktp', 'file_kk'];
-        foreach ($legacyFiles as $field) {
-            if (isset($pendaftar->{$field}) && $pendaftar->{$field}) {
-                Storage::delete('public/documents/' . $pendaftar->{$field});
-            }
-        }
+        // Create pendaftar record
+        $pendaftarData = [
+            'beasiswa_id' => $beasiswa->id,
+            'nama_lengkap' => $validated['nama_lengkap'],
+            'nim' => $validated['nim'],
+            'email' => $validated['email'],
+            'no_hp' => $validated['no_hp'],
+            'fakultas' => $validated['fakultas'],
+            'jurusan' => $validated['jurusan'],
+            'semester' => $validated['semester'],
+            'ipk' => $validated['ipk'],
+            'alasan_mendaftar' => $validated['alasan_mendaftar'],
+            'uploaded_documents' => $uploadedDocuments,
+            'status' => 'pending',
+        ];
 
-        $pendaftar->delete();
-        return redirect()->route('admin.pendaftar.index')
-                        ->with('success', 'Data pendaftar berhasil dihapus!');
+        Pendaftar::create($pendaftarData);
+
+        return redirect()->route('home')
+                        ->with('success', 'Pendaftaran beasiswa berhasil!');
     }
 
     /**
-     * Get rejection history untuk pendaftar tertentu (AJAX)
+     * Method untuk cek status NIM (updated untuk handle resubmit)
      */
-    public function getRejectionHistory(Pendaftar $pendaftar)
+    public function checkNIMStatus($nim)
     {
-        $histories = RejectionHistory::where('pendaftar_id', $pendaftar->id)
-                                   ->orderBy('rejected_at', 'desc')
-                                   ->get();
+        $applications = Pendaftar::where('nim', $nim)
+                                ->with('beasiswa')
+                                ->orderBy('created_at', 'desc')
+                                ->get();
+
+        $activeApplication = $applications->whereIn('status', ['pending', 'diterima'])->first();
+        $rejectedApplications = $applications->where('status', 'ditolak');
+        $resubmittableApplications = $rejectedApplications->where('can_resubmit', true);
 
         return response()->json([
-            'success' => true,
-            'data' => $histories->map(function($history) {
-                return [
-                    'id' => $history->id,
-                    'rejection_reason' => $history->rejection_reason,
-                    'can_resubmit' => $history->can_resubmit,
-                    'rejected_by' => $history->rejected_by,
-                    'rejected_at' => $history->rejected_at->format('d M Y H:i'),
-                ];
-            })
-        ]);
-    }
-
-    /**
-     * Get document summary for a specific pendaftar (AJAX)
-     */
-    public function getDocumentSummary(Pendaftar $pendaftar)
-    {
-        $beasiswa = $pendaftar->beasiswa;
-        $requiredDocuments = $beasiswa->required_documents ?? [];
-
-        $summary = [
-            'total_documents' => count($requiredDocuments),
-            'required_documents' => 0,
-            'uploaded_documents' => 0,
-            'uploaded_required' => 0,
-            'documents' => []
-        ];
-
-        foreach ($requiredDocuments as $document) {
-            $isUploaded = !empty($pendaftar->getDocument($document['key']));
-
-            if ($document['required']) {
-                $summary['required_documents']++;
-                if ($isUploaded) {
-                    $summary['uploaded_required']++;
-                }
-            }
-
-            if ($isUploaded) {
-                $summary['uploaded_documents']++;
-            }
-
-            $summary['documents'][] = [
-                'key' => $document['key'],
-                'name' => $document['name'],
-                'required' => $document['required'],
-                'uploaded' => $isUploaded,
-                'filename' => $pendaftar->getDocument($document['key'])
-            ];
-        }
-
-        $summary['completion_percentage'] = $summary['required_documents'] > 0
-            ? round(($summary['uploaded_required'] / $summary['required_documents']) * 100)
-            : 100;
-
-        return response()->json([
-            'success' => true,
-            'summary' => $summary
+            'nim' => $nim,
+            'has_active_application' => !is_null($activeApplication),
+            'active_application' => $activeApplication,
+            'total_applications' => $applications->count(),
+            'rejected_applications_count' => $rejectedApplications->count(),
+            'resubmittable_applications_count' => $resubmittableApplications->count(),
+            'can_apply_new' => is_null($activeApplication),
+            'has_resubmittable' => $resubmittableApplications->isNotEmpty(),
         ]);
     }
 }
