@@ -4,6 +4,7 @@
 
 @section('content')
 
+
     <style>
             /* Status Badge Colors */
             .bg-success-soft { background-color: #d1edff !important; }
@@ -105,6 +106,8 @@
         </style>
     </head>
     <body class="bg-light">
+
+
         <div class="container-fluid px-4 py-3">
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <div>
@@ -133,7 +136,8 @@
                             </div>
                         </div>
                         <div class="card-body p-4">
-                            <form action="#" method="POST" id="beasiswaForm">
+                            <form action="{{ route('admin.beasiswa.store') }}" method="POST" id="beasiswaForm">
+                                @csrf
                                 <!-- Form Section 1: Basic Information -->
                                 <div class="form-section mb-4">
                                     <h6 class="section-title mb-3">
@@ -308,6 +312,7 @@
                                             <small>Pastikan semua data sudah benar sebelum menyimpan</small>
                                         </div>
                                         <div class="d-flex gap-2">
+
                                             <button type="button" class="btn btn-outline-secondary">
                                                 <i class="fas fa-arrow-left me-2"></i>Kembali
                                             </button>
@@ -315,6 +320,7 @@
                                                 <i class="fas fa-undo me-2"></i>Reset
                                             </button>
                                             <button type="submit" class="btn btn-primary">
+
                                                 <i class="fas fa-save me-2"></i>Simpan Beasiswa
                                             </button>
                                         </div>
@@ -1416,5 +1422,135 @@
                     }, 2000);
                 });
             });
+
+            // Replace the existing form submission JavaScript in create.blade.php
+                // Form Submission
+                beasiswaForm.addEventListener('submit', function (e) {
+                    e.preventDefault();
+
+                    // Validate form fields
+                    if (formFieldsData.length === 0) {
+                        alert('Minimal harus ada 1 field form yang dikonfigurasi.');
+                        return;
+                    }
+
+                    // Validate documents
+                    if (documentsData.length === 0) {
+                        alert('Minimal harus ada 1 dokumen yang diperlukan.');
+                        return;
+                    }
+
+                    // Prepare form data
+                    const existingInputs = beasiswaForm.querySelectorAll('input[name^="form_fields"], input[name^="documents"]');
+                    existingInputs.forEach(input => input.remove());
+
+                    // Add form fields data
+                    formFieldsData.forEach((field, index) => {
+                        const fields = ['name', 'key', 'type', 'icon', 'placeholder', 'position', 'validation', 'required'];
+
+                        fields.forEach(fieldName => {
+                            const input = document.createElement('input');
+                            input.type = 'hidden';
+                            input.name = `form_fields[${index}][${fieldName}]`;
+
+                            if (fieldName === 'required') {
+                                input.value = field[fieldName] ? '1' : '0';
+                            } else {
+                                input.value = field[fieldName] || '';
+                            }
+
+                            beasiswaForm.appendChild(input);
+                        });
+
+                        // Add options for select/radio/checkbox fields
+                        if (field.options && Array.isArray(field.options)) {
+                            field.options.forEach((option, optionIndex) => {
+                                const valueInput = document.createElement('input');
+                                valueInput.type = 'hidden';
+                                valueInput.name = `form_fields[${index}][options][${optionIndex}][value]`;
+                                valueInput.value = option.value || '';
+                                beasiswaForm.appendChild(valueInput);
+
+                                const labelInput = document.createElement('input');
+                                labelInput.type = 'hidden';
+                                labelInput.name = `form_fields[${index}][options][${optionIndex}][label]`;
+                                labelInput.value = option.label || '';
+                                beasiswaForm.appendChild(labelInput);
+                            });
+                        }
+                    });
+
+                    // Add documents data
+                    documentsData.forEach((doc, index) => {
+                        const fields = ['name', 'key', 'icon', 'color', 'max_size', 'description', 'required'];
+
+                        fields.forEach(field => {
+                            const input = document.createElement('input');
+                            input.type = 'hidden';
+                            input.name = `documents[${index}][${field}]`;
+
+                            if (field === 'required') {
+                                input.value = doc[field] ? '1' : '0';
+                            } else {
+                                input.value = doc[field] || '';
+                            }
+
+                            beasiswaForm.appendChild(input);
+                        });
+
+                        // Add formats array
+                        doc.formats.forEach((format, formatIndex) => {
+                            const formatInput = document.createElement('input');
+                            formatInput.type = 'hidden';
+                            formatInput.name = `documents[${index}][formats][${formatIndex}]`;
+                            formatInput.value = format;
+                            beasiswaForm.appendChild(formatInput);
+                        });
+                    });
+
+                    // Show loading state
+                    const submitBtn = beasiswaForm.querySelector('button[type="submit"]');
+                    const originalContent = submitBtn.innerHTML;
+                    submitBtn.classList.add('loading');
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Menyimpan...';
+
+                    // Submit form
+                    const formData = new FormData(beasiswaForm);
+
+                    fetch(beasiswaForm.action, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest',
+                        }
+                    })
+                        .then(response => {
+                            if (response.ok) {
+                                return response.text();
+                            }
+                            throw new Error('Network response was not ok');
+                        })
+                        .then(data => {
+                            // Check if response contains success redirect
+                            if (data.includes('Beasiswa berhasil ditambahkan') || data.includes('redirect')) {
+                                window.location.href = '{{ route("admin.beasiswa.index") }}';
+                            } else {
+                                // Handle form errors by submitting normally
+                                beasiswaForm.submit();
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            // Fallback to normal form submission
+                            beasiswaForm.submit();
+                        })
+                        .finally(() => {
+                            // Reset loading state
+                            submitBtn.classList.remove('loading');
+                            submitBtn.disabled = false;
+                            submitBtn.innerHTML = originalContent;
+                        });
+                });
         </script>
 @endsection

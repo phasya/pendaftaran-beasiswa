@@ -8,29 +8,23 @@ return new class extends Migration
 {
     public function up()
     {
-        Schema::create('pendaftars', function (Blueprint $table) {
+        Schema::create('beasiswas', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('beasiswa_id')->constrained()->onDelete('cascade');
-            $table->string('nama_lengkap');
-            $table->string('nim');
-            $table->string('email');
-            $table->string('no_hp');
-            $table->string('fakultas');
-            $table->string('jurusan');
-            $table->integer('semester');
-            $table->decimal('ipk', 3, 2);
-            $table->text('alasan_mendaftar');
-            $table->json('uploaded_documents')->nullable();
-            $table->enum('status', ['pending', 'diterima', 'ditolak'])->default('pending');
-            $table->text('rejection_reason')->nullable();
-            $table->boolean('can_resubmit')->default(false);
-            $table->timestamp('rejected_at')->nullable();
+            $table->string('nama_beasiswa');
+            $table->text('deskripsi');
+            $table->decimal('jumlah_dana', 15, 2);
+            $table->date('tanggal_buka');
+            $table->date('tanggal_tutup');
+            $table->enum('status', ['aktif', 'nonaktif'])->default('aktif');
+            $table->text('persyaratan');
+            $table->json('form_fields')->nullable(); // Dynamic form fields
+            $table->json('required_documents')->nullable(); // Required documents
             $table->timestamps();
         });
     }
 
     public function down()
     {
-        Schema::dropIfExists('pendaftars');
+        Schema::dropIfExists('beasiswas');
     }
 };
