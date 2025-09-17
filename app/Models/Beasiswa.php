@@ -17,15 +17,13 @@ class Beasiswa extends Model
         'tanggal_tutup',
         'status',
         'persyaratan',
-        'form_fields',
         'required_documents'
     ];
 
     protected $casts = [
         'tanggal_buka' => 'date',
         'tanggal_tutup' => 'date',
-        'form_fields' => 'array',
-        'required_documents' => 'array'
+        'required_documents' => 'array'  // This will handle JSON conversion automatically
     ];
 
     public function pendaftars()
@@ -45,42 +43,19 @@ class Beasiswa extends Model
     }
 
     /**
-     * Get form fields with validation
-     */
-    public function getFormFieldsAttribute($value)
-    {
-        if (is_array($value)) {
-            return empty($value) ? $this->getDefaultFormFields() : $value;
-        }
-
-        $decoded = json_decode($value, true);
-
-        if (!is_array($decoded) || empty($decoded)) {
-            return $this->getDefaultFormFields();
-        }
-
-        return $decoded;
-    }
-
-    /**
-     * Set form fields attribute
-     */
-    public function setFormFieldsAttribute($value)
-    {
-        $this->attributes['form_fields'] = is_array($value) ? json_encode($value) : $value;
-    }
-
-    /**
      * Get required documents with validation
      */
     public function getRequiredDocumentsAttribute($value)
     {
+        // If already an array (from casting), return as is
         if (is_array($value)) {
             return empty($value) ? $this->getDefaultDocuments() : $value;
         }
 
+        // If string (JSON), decode it
         $decoded = json_decode($value, true);
 
+        // Return default documents if none set or invalid
         if (!is_array($decoded) || empty($decoded)) {
             return $this->getDefaultDocuments();
         }
@@ -93,116 +68,8 @@ class Beasiswa extends Model
      */
     public function setRequiredDocumentsAttribute($value)
     {
+        // Ensure it's stored as JSON
         $this->attributes['required_documents'] = is_array($value) ? json_encode($value) : $value;
-    }
-
-    /**
-     * Get default form fields structure
-     */
-    private function getDefaultFormFields()
-    {
-        return [
-            [
-                'name' => 'Nama Lengkap',
-                'key' => 'nama_lengkap',
-                'type' => 'text',
-                'icon' => 'fas fa-user',
-                'placeholder' => 'Masukkan nama lengkap',
-                'position' => 'personal',
-                'validation' => 'required|min:3|max:100',
-                'required' => true
-            ],
-            [
-                'name' => 'NIM',
-                'key' => 'nim',
-                'type' => 'number',
-                'icon' => 'fas fa-id-card',
-                'placeholder' => 'Masukkan NIM',
-                'position' => 'personal',
-                'validation' => 'required|digits_between:8,20',
-                'required' => true
-            ],
-            [
-                'name' => 'Email',
-                'key' => 'email',
-                'type' => 'email',
-                'icon' => 'fas fa-envelope',
-                'placeholder' => 'contoh@email.com',
-                'position' => 'personal',
-                'validation' => 'required|email',
-                'required' => true
-            ],
-            [
-                'name' => 'No. HP',
-                'key' => 'no_hp',
-                'type' => 'tel',
-                'icon' => 'fas fa-phone',
-                'placeholder' => '08xxxxxxxxxx',
-                'position' => 'personal',
-                'validation' => 'required|min:10|max:15',
-                'required' => true
-            ],
-            [
-                'name' => 'Fakultas',
-                'key' => 'fakultas',
-                'type' => 'text',
-                'icon' => 'fas fa-university',
-                'placeholder' => 'Contoh: Teknik',
-                'position' => 'academic',
-                'validation' => 'required|min:3|max:50',
-                'required' => true
-            ],
-            [
-                'name' => 'Jurusan',
-                'key' => 'jurusan',
-                'type' => 'text',
-                'icon' => 'fas fa-graduation-cap',
-                'placeholder' => 'Contoh: Teknik Informatika',
-                'position' => 'academic',
-                'validation' => 'required|min:3|max:100',
-                'required' => true
-            ],
-            [
-                'name' => 'Semester',
-                'key' => 'semester',
-                'type' => 'select',
-                'icon' => 'fas fa-calendar-check',
-                'placeholder' => '-- Pilih Semester --',
-                'position' => 'academic',
-                'validation' => 'required|between:1,14',
-                'required' => true,
-                'options' => [
-                    ['value' => '1', 'label' => 'Semester 1'],
-                    ['value' => '2', 'label' => 'Semester 2'],
-                    ['value' => '3', 'label' => 'Semester 3'],
-                    ['value' => '4', 'label' => 'Semester 4'],
-                    ['value' => '5', 'label' => 'Semester 5'],
-                    ['value' => '6', 'label' => 'Semester 6'],
-                    ['value' => '7', 'label' => 'Semester 7'],
-                    ['value' => '8', 'label' => 'Semester 8']
-                ]
-            ],
-            [
-                'name' => 'IPK',
-                'key' => 'ipk',
-                'type' => 'number',
-                'icon' => 'fas fa-chart-line',
-                'placeholder' => '3.50',
-                'position' => 'academic',
-                'validation' => 'required|numeric|between:0,4',
-                'required' => true
-            ],
-            [
-                'name' => 'Alasan Mendaftar',
-                'key' => 'alasan_mendaftar',
-                'type' => 'textarea',
-                'icon' => 'fas fa-comment-alt',
-                'placeholder' => 'Jelaskan alasan dan motivasi Anda mendaftar beasiswa ini...',
-                'position' => 'additional',
-                'validation' => 'required|min:50|max:1000',
-                'required' => true
-            ]
-        ];
     }
 
     /**
@@ -242,101 +109,6 @@ class Beasiswa extends Model
                 'description' => 'Kartu Keluarga'
             ]
         ];
-    }
-
-    /**
-     * Get form fields grouped by position
-     */
-    public function getFormFieldsByPosition()
-    {
-        $fields = $this->form_fields;
-        $grouped = [
-            'personal' => [],
-            'academic' => [],
-            'additional' => []
-        ];
-
-        foreach ($fields as $field) {
-            $position = $field['position'] ?? 'additional';
-            if (isset($grouped[$position])) {
-                $grouped[$position][] = $field;
-            } else {
-                $grouped['additional'][] = $field;
-            }
-        }
-
-        return $grouped;
-    }
-
-    /**
-     * Get validation rules for form fields
-     */
-    public function getFormFieldValidationRules()
-    {
-        $rules = [];
-
-        foreach ($this->form_fields as $field) {
-            $rule = [];
-
-            if ($field['required']) {
-                $rule[] = 'required';
-            } else {
-                $rule[] = 'nullable';
-            }
-
-            // Add type-specific rules
-            switch ($field['type']) {
-                case 'email':
-                    $rule[] = 'email';
-                    break;
-                case 'number':
-                    $rule[] = 'numeric';
-                    break;
-                case 'date':
-                    $rule[] = 'date';
-                    break;
-                case 'tel':
-                    $rule[] = 'string';
-                    break;
-            }
-
-            // Add custom validation from field config
-            if (!empty($field['validation'])) {
-                $customRules = explode('|', $field['validation']);
-                foreach ($customRules as $customRule) {
-                    if (!in_array($customRule, $rule)) {
-                        $rule[] = $customRule;
-                    }
-                }
-            }
-
-            $rules[$field['key']] = implode('|', $rule);
-        }
-
-        return $rules;
-    }
-
-    /**
-     * Get validation messages for form fields
-     */
-    public function getFormFieldValidationMessages()
-    {
-        $messages = [];
-
-        foreach ($this->form_fields as $field) {
-            $key = $field['key'];
-            $name = $field['name'];
-
-            $messages["{$key}.required"] = "Field {$name} wajib diisi.";
-            $messages["{$key}.email"] = "Format {$name} tidak valid.";
-            $messages["{$key}.numeric"] = "{$name} harus berupa angka.";
-            $messages["{$key}.date"] = "Format {$name} harus berupa tanggal yang valid.";
-            $messages["{$key}.min"] = "{$name} minimal harus berisi :min karakter.";
-            $messages["{$key}.max"] = "{$name} maksimal berisi :max karakter.";
-            $messages["{$key}.between"] = "{$name} harus berada di antara :min dan :max.";
-        }
-
-        return $messages;
     }
 
     /**
