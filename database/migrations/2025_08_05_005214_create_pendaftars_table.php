@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     public function up()
     {
         Schema::create('beasiswas', function (Blueprint $table) {
@@ -17,8 +16,8 @@ return new class extends Migration
             $table->date('tanggal_tutup');
             $table->enum('status', ['aktif', 'nonaktif'])->default('aktif');
             $table->text('persyaratan');
-            $table->json('form_fields')->nullable(); // Dynamic form fields
-            $table->json('required_documents')->nullable(); // Required documents
+            $table->json('form_fields')->nullable(); // KOLOM INI YANG HILANG
+            $table->json('required_documents')->nullable();
             $table->timestamps();
         });
     }

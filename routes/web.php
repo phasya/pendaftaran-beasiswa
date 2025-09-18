@@ -31,7 +31,8 @@ Route::controller(AuthController::class)->group(function () {
 Route::controller(PendaftarController::class)->group(function () {
     Route::get('/beasiswa/{beasiswa}/daftar', 'create')->name('pendaftar.create');
     Route::post('/beasiswa/{beasiswa}/daftar', 'store')->name('pendaftar.store');
-    
+    Route::resource('beasiswa', BeasiswaController::class);
+
     // Protected routes for logged-in users
     Route::middleware('auth')->group(function () {
         Route::get('/pendaftar/{pendaftar}', 'show')->name('pendaftar.show');

@@ -10,7 +10,7 @@ class BeasiswaController extends Controller
 {
     public function index()
     {
-        $beasiswas = Beasiswa::withCount('pendaftars')->latest()->paginate(10);
+        $beasiswas = Beasiswa::latest()->paginate(10);
         return view('admin.beasiswa.index', compact('beasiswas'));
     }
 
@@ -21,6 +21,9 @@ class BeasiswaController extends Controller
 
     public function store(Request $request)
     {
+        // Debug: Uncomment ini untuk melihat data yang diterima
+        // dd($request->all());
+
         $validated = $request->validate([
             'nama_beasiswa' => 'required|string|max:255',
             'deskripsi' => 'required|string',
@@ -29,73 +32,114 @@ class BeasiswaController extends Controller
             'tanggal_tutup' => 'required|date|after:tanggal_buka',
             'status' => 'required|in:aktif,nonaktif',
             'persyaratan' => 'required|string',
+            'form_fields' => 'required|array|min:1',
+            'form_fields.*.name' => 'required|string|max:255',
+            'form_fields.*.key' => 'required|string|max:255',
+            'form_fields.*.type' => 'required|string',
+            'form_fields.*.icon' => 'required|string',
+            'form_fields.*.position' => 'required|string',
+            'form_fields.*.validation' => 'nullable|string',
+            'form_fields.*.placeholder' => 'nullable|string',
+            'form_fields.*.required' => 'required|boolean',
             'documents' => 'required|array|min:1',
             'documents.*.name' => 'required|string|max:255',
-            'documents.*.key' => 'required|string|max:100|regex:/^[a-z0-9_]+$/',
-            'documents.*.icon' => 'required|string|max:100',
-            'documents.*.color' => 'required|string|in:red,blue,green,yellow,purple,orange,teal,gray',
+            'documents.*.key' => 'required|string|max:255',
+            'documents.*.icon' => 'required|string',
+            'documents.*.color' => 'required|string',
             'documents.*.formats' => 'required|array|min:1',
-            'documents.*.formats.*' => 'string|in:pdf,jpg,jpeg,png,doc,docx',
-            'documents.*.max_size' => 'required|integer|min:1|max:10',
-            'documents.*.description' => 'nullable|string|max:255',
-            'documents.*.required' => 'boolean',
-        ], [
-            'documents.required' => 'Minimal harus ada 1 dokumen yang diperlukan.',
-            'documents.*.name.required' => 'Nama dokumen wajib diisi.',
-            'documents.*.key.required' => 'Key dokumen wajib diisi.',
-            'documents.*.key.regex' => 'Key hanya boleh berisi huruf kecil, angka, dan underscore.',
-            'documents.*.icon.required' => 'Icon dokumen wajib dipilih.',
-            'documents.*.color.required' => 'Warna dokumen wajib dipilih.',
-            'documents.*.formats.required' => 'Format file wajib dipilih.',
-            'documents.*.max_size.required' => 'Ukuran maksimal wajib diisi.',
+            'documents.*.max_size' => 'required|numeric|min:1|max:10',
+            'documents.*.description' => 'nullable|string',
+            'documents.*.required' => 'required|boolean'
         ]);
 
-        // Validate unique document keys
-        $documentKeys = array_column($validated['documents'], 'key');
-        if (count($documentKeys) !== count(array_unique($documentKeys))) {
-            return redirect()->back()
-                           ->withInput()
-                           ->withErrors(['documents' => 'Setiap dokumen harus memiliki key yang unik.']);
-        }
-
-        // Process documents data
-        $requiredDocuments = [];
-        foreach ($validated['documents'] as $index => $document) {
-            $requiredDocuments[] = [
-                'name' => $document['name'],
-                'key' => $document['key'],
-                'icon' => $document['icon'],
-                'color' => $document['color'],
-                'formats' => $document['formats'],
-                'max_size' => (int) $document['max_size'],
-                'description' => $document['description'] ?? '',
-                'required' => isset($document['required']) && $document['required'] == '1',
+        // Siapkan data untuk disimpan
+        $processedFormFields = [];
+        foreach ($validated['form_fields'] as $field) {
+            $processedFormFields[] = [
+                'name' => $field['name'] ?? '',
+                'key' => $field['key'] ?? '',
+                'type' => $field['type'] ?? 'text',
+                'icon' => $field['icon'] ?? 'fas fa-user',
+                'placeholder' => $field['placeholder'] ?? '',
+                'position' => $field['position'] ?? 'personal',
+                'validation' => $field['validation'] ?? '',
+                'required' => (bool) ($field['required'] ?? true),
+                'options' => $field['options'] ?? []
             ];
         }
 
-        $validated['required_documents'] = $requiredDocuments;
-        unset($validated['documents']);
+        $processedDocuments = [];
+        foreach ($validated['documents'] as $doc) {
+            $processedDocuments[] = [
+                'name' => $doc['name'] ?? '',
+                'key' => $doc['key'] ?? '',
+                'icon' => $doc['icon'] ?? 'fas fa-file',
+                'color' => $doc['color'] ?? 'gray',
+                'formats' => $doc['formats'] ?? [],
+                'max_size' => (int) ($doc['max_size'] ?? 5),
+                'description' => $doc['description'] ?? '',
+                'required' => (bool) ($doc['required'] ?? true)
+            ];
+        }
 
-        Beasiswa::create($validated);
+        $beasiswaData = [
+            'nama_beasiswa' => $validated['nama_beasiswa'],
+            'deskripsi' => $validated['deskripsi'],
+            'jumlah_dana' => $validated['jumlah_dana'],
+            'tanggal_buka' => $validated['tanggal_buka'],
+            'tanggal_tutup' => $validated['tanggal_tutup'],
+            'status' => $validated['status'],
+            'persyaratan' => $validated['persyaratan'],
+            'form_fields' => json_encode($processedFormFields),
+            'documents' => json_encode($processedDocuments)
+        ];
+
+        Beasiswa::create($beasiswaData);
 
         return redirect()->route('admin.beasiswa.index')
-                        ->with('success', 'Beasiswa berhasil ditambahkan!');
+            ->with('success', 'Beasiswa berhasil ditambahkan!');
     }
 
     public function show(Beasiswa $beasiswa)
     {
-        $beasiswa->load('pendaftars');
+        // Decode JSON data untuk ditampilkan (hanya jika data ada dan berupa string)
+        if (!empty($beasiswa->form_fields) && is_string($beasiswa->form_fields)) {
+            $beasiswa->form_fields = json_decode($beasiswa->form_fields, true);
+        } else {
+            $beasiswa->form_fields = [];
+        }
+
+        if (!empty($beasiswa->documents) && is_string($beasiswa->documents)) {
+            $beasiswa->documents = json_decode($beasiswa->documents, true);
+        } else {
+            $beasiswa->documents = [];
+        }
+
         return view('admin.beasiswa.show', compact('beasiswa'));
     }
 
     public function edit(Beasiswa $beasiswa)
     {
+        // Decode JSON data untuk form edit (hanya jika data ada dan berupa string)
+        if (!empty($beasiswa->form_fields) && is_string($beasiswa->form_fields)) {
+            $beasiswa->form_fields = json_decode($beasiswa->form_fields, true);
+        } else {
+            $beasiswa->form_fields = [];
+        }
+
+        if (!empty($beasiswa->documents) && is_string($beasiswa->documents)) {
+            $beasiswa->documents = json_decode($beasiswa->documents, true);
+        } else {
+            $beasiswa->documents = [];
+        }
+
         return view('admin.beasiswa.edit', compact('beasiswa'));
     }
 
     public function update(Request $request, Beasiswa $beasiswa)
     {
-        $validated = $request->validate([
+        $validated = $request->validate
+        ([
             'nama_beasiswa' => 'required|string|max:255',
             'deskripsi' => 'required|string',
             'jumlah_dana' => 'required|numeric|min:0',
@@ -103,54 +147,46 @@ class BeasiswaController extends Controller
             'tanggal_tutup' => 'required|date|after:tanggal_buka',
             'status' => 'required|in:aktif,nonaktif',
             'persyaratan' => 'required|string',
+            'form_fields' => 'required|array|min:1',
+            'form_fields.*.name' => 'required|string|max:255',
+            'form_fields.*.key' => 'required|string|max:255',
+            'form_fields.*.type' => 'required|string',
+            'form_fields.*.icon' => 'required|string',
+            'form_fields.*.position' => 'required|string',
+            'form_fields.*.required' => 'required|boolean',
             'documents' => 'required|array|min:1',
             'documents.*.name' => 'required|string|max:255',
-            'documents.*.key' => 'required|string|max:100|regex:/^[a-z0-9_]+$/',
-            'documents.*.icon' => 'required|string|max:100',
-            'documents.*.color' => 'required|string|in:red,blue,green,yellow,purple,orange,teal,gray',
+            'documents.*.key' => 'required|string|max:255',
+            'documents.*.icon' => 'required|string',
+            'documents.*.color' => 'required|string',
             'documents.*.formats' => 'required|array|min:1',
-            'documents.*.formats.*' => 'string|in:pdf,jpg,jpeg,png,doc,docx',
-            'documents.*.max_size' => 'required|integer|min:1|max:10',
-            'documents.*.description' => 'nullable|string|max:255',
-            'documents.*.required' => 'boolean',
+            'documents.*.max_size' => 'required|numeric|min:1|max:10',
+            'documents.*.required' => 'required|boolean'
         ]);
 
-        // Validate unique document keys
-        $documentKeys = array_column($validated['documents'], 'key');
-        if (count($documentKeys) !== count(array_unique($documentKeys))) {
-            return redirect()->back()
-                           ->withInput()
-                           ->withErrors(['documents' => 'Setiap dokumen harus memiliki key yang unik.']);
-        }
+        // Siapkan data untuk diupdate
+        $updateData = [
+            'nama_beasiswa' => $validated['nama_beasiswa'],
+            'deskripsi' => $validated['deskripsi'],
+            'jumlah_dana' => $validated['jumlah_dana'],
+            'tanggal_buka' => $validated['tanggal_buka'],
+            'tanggal_tutup' => $validated['tanggal_tutup'],
+            'status' => $validated['status'],
+            'persyaratan' => $validated['persyaratan'],
+            'form_fields' => json_encode($validated['form_fields']),
+            'documents' => json_encode($validated['documents'])
+        ];
 
-        // Process documents data
-        $requiredDocuments = [];
-        foreach ($validated['documents'] as $index => $document) {
-            $requiredDocuments[] = [
-                'name' => $document['name'],
-                'key' => $document['key'],
-                'icon' => $document['icon'],
-                'color' => $document['color'],
-                'formats' => $document['formats'],
-                'max_size' => (int) $document['max_size'],
-                'description' => $document['description'] ?? '',
-                'required' => isset($document['required']) && $document['required'] == '1',
-            ];
-        }
-
-        $validated['required_documents'] = $requiredDocuments;
-        unset($validated['documents']);
-
-        $beasiswa->update($validated);
+        $beasiswa->update($updateData);
 
         return redirect()->route('admin.beasiswa.index')
-                        ->with('success', 'Beasiswa berhasil diupdate!');
+            ->with('success', 'Beasiswa berhasil diupdate!');
     }
 
     public function destroy(Beasiswa $beasiswa)
     {
         $beasiswa->delete();
         return redirect()->route('admin.beasiswa.index')
-                        ->with('success', 'Beasiswa berhasil dihapus!');
+            ->with('success', 'Beasiswa berhasil dihapus!');
     }
 }

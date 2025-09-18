@@ -18,14 +18,16 @@ class Beasiswa extends Model
         'status',
         'persyaratan',
         'form_fields',
-        'required_documents'
+        'required_documents',
+        'dynamic_fields'
     ];
 
     protected $casts = [
         'tanggal_buka' => 'date',
         'tanggal_tutup' => 'date',
         'form_fields' => 'array',
-        'required_documents' => 'array'
+        'required_documents' => 'array',
+        'dynamic_fields' => 'array'
     ];
 
     public function pendaftars()
@@ -42,6 +44,44 @@ class Beasiswa extends Model
     public function getFormattedDanaAttribute()
     {
         return 'Rp ' . number_format($this->jumlah_dana, 0, ',', '.');
+    }
+
+    /**
+     * Validate form fields for duplicate keys
+     */
+    public function validateFormFieldsUniqueness($formFields)
+    {
+        if (!is_array($formFields)) {
+            return true;
+        }
+
+        $keys = collect($formFields)->pluck('key')->filter()->toArray();
+        $duplicates = array_diff_assoc($keys, array_unique($keys));
+
+        if (!empty($duplicates)) {
+            throw new \InvalidArgumentException('Key form field yang benar-benar duplikat: ' . implode(', ', array_unique($duplicates)));
+        }
+
+        return true;
+    }
+
+    /**
+     * Validate required documents for duplicate keys
+     */
+    public function validateDocumentsUniqueness($documents)
+    {
+        if (!is_array($documents)) {
+            return true;
+        }
+
+        $keys = collect($documents)->pluck('key')->filter()->toArray();
+        $duplicates = array_diff_assoc($keys, array_unique($keys));
+
+        if (!empty($duplicates)) {
+            throw new \InvalidArgumentException('Key dokumen yang benar-benar duplikat: ' . implode(', ', array_unique($duplicates)));
+        }
+
+        return true;
     }
 
     /**
@@ -63,11 +103,17 @@ class Beasiswa extends Model
     }
 
     /**
-     * Set form fields attribute
+     * Set form fields attribute with duplicate validation
      */
     public function setFormFieldsAttribute($value)
     {
-        $this->attributes['form_fields'] = is_array($value) ? json_encode($value) : $value;
+        if (is_array($value)) {
+            // Validasi duplikasi sebelum menyimpan
+            $this->validateFormFieldsUniqueness($value);
+            $this->attributes['form_fields'] = json_encode($value);
+        } else {
+            $this->attributes['form_fields'] = $value;
+        }
     }
 
     /**
@@ -89,11 +135,17 @@ class Beasiswa extends Model
     }
 
     /**
-     * Set required documents attribute
+     * Set required documents attribute with duplicate validation
      */
     public function setRequiredDocumentsAttribute($value)
     {
-        $this->attributes['required_documents'] = is_array($value) ? json_encode($value) : $value;
+        if (is_array($value)) {
+            // Validasi duplikasi sebelum menyimpan
+            $this->validateDocumentsUniqueness($value);
+            $this->attributes['required_documents'] = json_encode($value);
+        } else {
+            $this->attributes['required_documents'] = $value;
+        }
     }
 
     /**

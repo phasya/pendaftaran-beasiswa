@@ -29,16 +29,10 @@
                 placeholder="{{ $field['placeholder'] ?? '' }}"
                 {{ $field['required'] ? 'required' : '' }}
                 @if($field['type'] === 'number')
-                    @if(str_contains($field['validation'], 'min:'))
-                        min="{{ preg_match('/min:(\d+)/', $field['validation'], $matches) ? $matches[1] : '' }}"
-                    @endif
-                    @if(str_contains($field['validation'], 'max:'))
-                        max="{{ preg_match('/max:(\d+)/', $field['validation'], $matches) ? $matches[1] : '' }}"
-                    @endif
-                    @if($field['key'] === 'ipk')
-                        step="0.01" min="0" max="4"
-                    @endif
-                @endif
+    @if(isset($field['validation']) && str_contains($field['validation'], 'min:'))
+        min="{{ preg_match('/min:(\d+)/', $field['validation'], $matches) ? $matches[1] : '' }}"
+    @endif
+@endif
             >
             @break
 
