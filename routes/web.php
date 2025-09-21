@@ -59,4 +59,43 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
             ->name('pendaftar.rejection-history');
         Route::patch('/pendaftar/{pendaftar}/status', 'updateStatus')->name('pendaftar.update-status');
     });
+
+    Route::post('admin/beasiswa/{beasiswa}/fix-data', [BeasiswaController::class, 'fixData'])
+        ->name('admin.beasiswa.fix-data');
+
+    // Route sementara untuk fix data
+    Route::get('admin/fix-beasiswa/{id}', function ($id) {
+        $beasiswa = \App\Models\Beasiswa::find($id);
+        if ($beasiswa) {
+            $beasiswa->autoFixCorruptedData();
+            return "Fixed beasiswa ID: " . $id;
+        }
+        return "Beasiswa not found";
+    });
+
+    // Route untuk beasiswa cleaning (tambahkan setelah resource routes beasiswa)
+    Route::group(['prefix' => 'admin', 'middleware' => ['auth']], function () {
+
+        // Existing beasiswa resource routes
+        Route::resource('beasiswa', 'App\Http\Controllers\Admin\BeasiswaController');
+
+        // NEW: Additional routes untuk cleaning data
+        Route::prefix('beasiswa')->group(function () {
+            // Clean duplicate data untuk beasiswa tertentu
+            Route::post('{beasiswa}/clean', [App\Http\Controllers\Admin\BeasiswaController::class, 'clean'])
+                ->name('admin.beasiswa.clean');
+
+            // Analyze duplicate data untuk beasiswa tertentu (untuk debugging)
+            Route::get('{beasiswa}/analyze', [App\Http\Controllers\Admin\BeasiswaController::class, 'analyze'])
+                ->name('admin.beasiswa.analyze');
+
+            // Bulk clean semua beasiswa
+            Route::post('bulk-clean', [App\Http\Controllers\Admin\BeasiswaController::class, 'bulkClean'])
+                ->name('admin.beasiswa.bulk-clean');
+            // Di routes/web.php, tambahkan:
+            Route::post('admin/beasiswa/{beasiswa}/clean', [BeasiswaController::class, 'clean'])->name('admin.beasiswa.clean');
+            Route::get('admin/beasiswa/{beasiswa}/analyze', [BeasiswaController::class, 'analyze'])->name('admin.beasiswa.analyze');
+            Route::post('admin/beasiswa/bulk-clean', [BeasiswaController::class, 'bulkClean'])->name('admin.beasiswa.bulk-clean');
+        });
+    });
 });

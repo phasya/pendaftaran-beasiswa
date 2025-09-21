@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
+use Illuminate\Support\Collection;
 
 class Beasiswa extends Model
 {
@@ -47,50 +49,193 @@ class Beasiswa extends Model
     }
 
     /**
-     * Validate form fields for duplicate keys
+     * Generate unique key from name
      */
-    public function validateFormFieldsUniqueness($formFields)
+    public static function generateUniqueKey($name, $usedKeys = [], $prefix = '')
+    {
+        // Clean and convert name to key format
+        $baseKey = Str::slug($name, '_');
+        $baseKey = preg_replace('/[^a-z0-9_]/', '', strtolower($baseKey));
+        $baseKey = substr($baseKey, 0, 30);
+
+        // Fallback if empty
+        if (empty($baseKey)) {
+            $baseKey = $prefix ? 'default' : 'field';
+        }
+
+        if ($prefix) {
+            $baseKey = $prefix . '_' . $baseKey;
+        }
+
+        $key = $baseKey;
+        $counter = 1;
+
+        // Ensure uniqueness
+        while (in_array($key, $usedKeys)) {
+            $key = $baseKey . '_' . $counter;
+            $counter++;
+        }
+
+        return $key;
+    }
+
+    /**
+     * Process and auto-generate keys for form fields
+     */
+    public function processFormFields($formFields)
     {
         if (!is_array($formFields)) {
-            return true;
+            return $this->getDefaultFormFields();
         }
 
-        $keys = collect($formFields)->pluck('key')->filter()->toArray();
-        $duplicates = array_diff_assoc($keys, array_unique($keys));
+        $processedFields = [];
+        $usedKeys = [];
 
-        if (!empty($duplicates)) {
-            throw new \InvalidArgumentException('Key form field yang benar-benar duplikat: ' . implode(', ', array_unique($duplicates)));
+        foreach ($formFields as $field) {
+            if (empty($field['name'])) {
+                continue; // Skip fields without names
+            }
+
+            // Generate unique key if not provided or empty
+            if (empty($field['key'])) {
+                $field['key'] = self::generateUniqueKey($field['name'], $usedKeys);
+            } else {
+                // Sanitize existing key
+                $field['key'] = $this->sanitizeKey($field['key']);
+
+                // Ensure uniqueness
+                if (in_array($field['key'], $usedKeys)) {
+                    $field['key'] = self::generateUniqueKey($field['name'], $usedKeys);
+                }
+            }
+
+            $usedKeys[] = $field['key'];
+
+            // Process options for select/radio/checkbox fields
+            $processedOptions = [];
+            if (!empty($field['options']) && is_array($field['options'])) {
+                foreach ($field['options'] as $option) {
+                    if (is_array($option)) {
+                        $processedOptions[] = [
+                            'value' => $option['value'] ?? '',
+                            'label' => $option['label'] ?? ($option['value'] ?? '')
+                        ];
+                    } else {
+                        // Handle string options
+                        $processedOptions[] = [
+                            'value' => $option,
+                            'label' => $option
+                        ];
+                    }
+                }
+            }
+
+            $processedFields[] = [
+                'name' => $field['name'] ?? '',
+                'key' => $field['key'],
+                'type' => $field['type'] ?? 'text',
+                'icon' => $field['icon'] ?? 'fas fa-user',
+                'placeholder' => $field['placeholder'] ?? '',
+                'position' => $field['position'] ?? 'personal',
+                'validation' => $field['validation'] ?? '',
+                'required' => (bool) ($field['required'] ?? true),
+                'options' => $processedOptions
+            ];
         }
 
-        return true;
+        return empty($processedFields) ? $this->getDefaultFormFields() : $processedFields;
     }
 
     /**
-     * Validate required documents for duplicate keys
+     * Process and auto-generate keys for required documents
      */
-    public function validateDocumentsUniqueness($documents)
+    public function processRequiredDocuments($documents)
     {
         if (!is_array($documents)) {
-            return true;
+            return $this->getDefaultDocuments();
         }
 
-        $keys = collect($documents)->pluck('key')->filter()->toArray();
-        $duplicates = array_diff_assoc($keys, array_unique($keys));
+        $processedDocs = [];
+        $usedKeys = [];
 
-        if (!empty($duplicates)) {
-            throw new \InvalidArgumentException('Key dokumen yang benar-benar duplikat: ' . implode(', ', array_unique($duplicates)));
+        foreach ($documents as $doc) {
+            if (empty($doc['name'])) {
+                continue; // Skip documents without names
+            }
+
+            // Generate unique key if not provided or empty
+            if (empty($doc['key'])) {
+                $doc['key'] = self::generateUniqueKey($doc['name'], $usedKeys, 'file');
+            } else {
+                // Sanitize existing key
+                $doc['key'] = $this->sanitizeKey($doc['key'], 'file');
+
+                // Ensure uniqueness
+                if (in_array($doc['key'], $usedKeys)) {
+                    $doc['key'] = self::generateUniqueKey($doc['name'], $usedKeys, 'file');
+                }
+            }
+
+            $usedKeys[] = $doc['key'];
+
+            // Process formats array
+            $formats = [];
+            if (!empty($doc['formats']) && is_array($doc['formats'])) {
+                $formats = array_filter($doc['formats'], function ($format) {
+                    return in_array(strtolower($format), ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx']);
+                });
+            }
+
+            $processedDocs[] = [
+                'name' => $doc['name'] ?? '',
+                'key' => $doc['key'],
+                'icon' => $doc['icon'] ?? 'fas fa-file',
+                'color' => $doc['color'] ?? 'gray',
+                'formats' => array_values($formats),
+                'max_size' => max(1, min(10, (int) ($doc['max_size'] ?? 5))),
+                'description' => $doc['description'] ?? '',
+                'required' => (bool) ($doc['required'] ?? true)
+            ];
         }
 
-        return true;
+        return empty($processedDocs) ? $this->getDefaultDocuments() : $processedDocs;
     }
 
     /**
-     * Get form fields with validation
+     * Sanitize key to ensure it's database/form safe
+     */
+    private function sanitizeKey($key, $prefix = '')
+    {
+        // Remove any non-alphanumeric characters except underscores
+        $sanitized = preg_replace('/[^a-zA-Z0-9_]/', '_', $key);
+        $sanitized = strtolower($sanitized);
+
+        // Remove multiple consecutive underscores
+        $sanitized = preg_replace('/_+/', '_', $sanitized);
+
+        // Trim underscores from start and end
+        $sanitized = trim($sanitized, '_');
+
+        // Ensure it starts with the prefix if provided
+        if ($prefix && !str_starts_with($sanitized, $prefix . '_')) {
+            $sanitized = $prefix . '_' . $sanitized;
+        }
+
+        // Limit length
+        return substr($sanitized, 0, 50);
+    }
+
+    /**
+     * Get form fields with validation and auto-processing
      */
     public function getFormFieldsAttribute($value)
     {
+        if (is_null($value) || $value === '') {
+            return $this->getDefaultFormFields();
+        }
+
         if (is_array($value)) {
-            return empty($value) ? $this->getDefaultFormFields() : $value;
+            return empty($value) ? $this->getDefaultFormFields() : $this->processFormFields($value);
         }
 
         $decoded = json_decode($value, true);
@@ -99,30 +244,35 @@ class Beasiswa extends Model
             return $this->getDefaultFormFields();
         }
 
-        return $decoded;
+        return $this->processFormFields($decoded);
     }
 
     /**
-     * Set form fields attribute with duplicate validation
+     * Set form fields attribute with processing
      */
     public function setFormFieldsAttribute($value)
     {
-        if (is_array($value)) {
-            // Validasi duplikasi sebelum menyimpan
-            $this->validateFormFieldsUniqueness($value);
-            $this->attributes['form_fields'] = json_encode($value);
+        if (is_null($value)) {
+            $this->attributes['form_fields'] = json_encode($this->getDefaultFormFields());
+        } elseif (is_array($value)) {
+            $processed = $this->processFormFields($value);
+            $this->attributes['form_fields'] = json_encode($processed);
         } else {
             $this->attributes['form_fields'] = $value;
         }
     }
 
     /**
-     * Get required documents with validation
+     * Get required documents with validation and auto-processing
      */
     public function getRequiredDocumentsAttribute($value)
     {
+        if (is_null($value) || $value === '') {
+            return $this->getDefaultDocuments();
+        }
+
         if (is_array($value)) {
-            return empty($value) ? $this->getDefaultDocuments() : $value;
+            return empty($value) ? $this->getDefaultDocuments() : $this->processRequiredDocuments($value);
         }
 
         $decoded = json_decode($value, true);
@@ -131,18 +281,19 @@ class Beasiswa extends Model
             return $this->getDefaultDocuments();
         }
 
-        return $decoded;
+        return $this->processRequiredDocuments($decoded);
     }
 
     /**
-     * Set required documents attribute with duplicate validation
+     * Set required documents attribute with processing
      */
     public function setRequiredDocumentsAttribute($value)
     {
-        if (is_array($value)) {
-            // Validasi duplikasi sebelum menyimpan
-            $this->validateDocumentsUniqueness($value);
-            $this->attributes['required_documents'] = json_encode($value);
+        if (is_null($value)) {
+            $this->attributes['required_documents'] = json_encode($this->getDefaultDocuments());
+        } elseif (is_array($value)) {
+            $processed = $this->processRequiredDocuments($value);
+            $this->attributes['required_documents'] = json_encode($processed);
         } else {
             $this->attributes['required_documents'] = $value;
         }
@@ -162,7 +313,8 @@ class Beasiswa extends Model
                 'placeholder' => 'Masukkan nama lengkap',
                 'position' => 'personal',
                 'validation' => 'required|min:3|max:100',
-                'required' => true
+                'required' => true,
+                'options' => []
             ],
             [
                 'name' => 'NIM',
@@ -172,7 +324,8 @@ class Beasiswa extends Model
                 'placeholder' => 'Masukkan NIM',
                 'position' => 'personal',
                 'validation' => 'required|digits_between:8,20',
-                'required' => true
+                'required' => true,
+                'options' => []
             ],
             [
                 'name' => 'Email',
@@ -182,7 +335,8 @@ class Beasiswa extends Model
                 'placeholder' => 'contoh@email.com',
                 'position' => 'personal',
                 'validation' => 'required|email',
-                'required' => true
+                'required' => true,
+                'options' => []
             ],
             [
                 'name' => 'No. HP',
@@ -192,7 +346,8 @@ class Beasiswa extends Model
                 'placeholder' => '08xxxxxxxxxx',
                 'position' => 'personal',
                 'validation' => 'required|min:10|max:15',
-                'required' => true
+                'required' => true,
+                'options' => []
             ],
             [
                 'name' => 'Fakultas',
@@ -202,7 +357,8 @@ class Beasiswa extends Model
                 'placeholder' => 'Contoh: Teknik',
                 'position' => 'academic',
                 'validation' => 'required|min:3|max:50',
-                'required' => true
+                'required' => true,
+                'options' => []
             ],
             [
                 'name' => 'Jurusan',
@@ -212,7 +368,8 @@ class Beasiswa extends Model
                 'placeholder' => 'Contoh: Teknik Informatika',
                 'position' => 'academic',
                 'validation' => 'required|min:3|max:100',
-                'required' => true
+                'required' => true,
+                'options' => []
             ],
             [
                 'name' => 'Semester',
@@ -242,7 +399,8 @@ class Beasiswa extends Model
                 'placeholder' => '3.50',
                 'position' => 'academic',
                 'validation' => 'required|numeric|between:0,4',
-                'required' => true
+                'required' => true,
+                'options' => []
             ],
             [
                 'name' => 'Alasan Mendaftar',
@@ -252,7 +410,8 @@ class Beasiswa extends Model
                 'placeholder' => 'Jelaskan alasan dan motivasi Anda mendaftar beasiswa ini...',
                 'position' => 'additional',
                 'validation' => 'required|min:50|max:1000',
-                'required' => true
+                'required' => true,
+                'options' => []
             ]
         ];
     }
@@ -265,7 +424,7 @@ class Beasiswa extends Model
         return [
             [
                 'name' => 'Transkrip Nilai',
-                'key' => 'file_transkrip',
+                'key' => 'file_transkrip_nilai',
                 'icon' => 'fas fa-file-pdf',
                 'color' => 'red',
                 'formats' => ['pdf'],
@@ -285,7 +444,7 @@ class Beasiswa extends Model
             ],
             [
                 'name' => 'Kartu Keluarga',
-                'key' => 'file_kk',
+                'key' => 'file_kartu_keluarga',
                 'icon' => 'fas fa-users',
                 'color' => 'green',
                 'formats' => ['pdf', 'jpg', 'jpeg', 'png'],
@@ -350,13 +509,28 @@ class Beasiswa extends Model
                 case 'tel':
                     $rule[] = 'string';
                     break;
+                case 'select':
+                case 'radio':
+                    // Validate against available options
+                    if (!empty($field['options'])) {
+                        $validValues = collect($field['options'])->pluck('value')->toArray();
+                        $rule[] = 'in:' . implode(',', $validValues);
+                    }
+                    break;
+                case 'checkbox':
+                    $rule[] = 'array';
+                    if (!empty($field['options'])) {
+                        $validValues = collect($field['options'])->pluck('value')->toArray();
+                        $rule[] = 'in:' . implode(',', $validValues);
+                    }
+                    break;
             }
 
             // Add custom validation from field config
             if (!empty($field['validation'])) {
                 $customRules = explode('|', $field['validation']);
                 foreach ($customRules as $customRule) {
-                    if (!in_array($customRule, $rule)) {
+                    if (!in_array($customRule, $rule) && $customRule !== 'required') {
                         $rule[] = $customRule;
                     }
                 }
@@ -386,6 +560,8 @@ class Beasiswa extends Model
             $messages["{$key}.min"] = "{$name} minimal harus berisi :min karakter.";
             $messages["{$key}.max"] = "{$name} maksimal berisi :max karakter.";
             $messages["{$key}.between"] = "{$name} harus berada di antara :min dan :max.";
+            $messages["{$key}.in"] = "{$name} harus memilih salah satu opsi yang tersedia.";
+            $messages["{$key}.array"] = "{$name} harus berupa pilihan yang valid.";
         }
 
         return $messages;
@@ -456,5 +632,172 @@ class Beasiswa extends Model
         }
 
         return $messages;
+    }
+
+    /**
+     * Validate form fields data integrity
+     */
+    public function validateFormFieldsIntegrity()
+    {
+        $errors = [];
+        $usedKeys = [];
+
+        foreach ($this->form_fields as $index => $field) {
+            $fieldName = "Field " . ($index + 1);
+
+            // Check required properties
+            if (empty($field['name'])) {
+                $errors[] = "{$fieldName}: Name is required";
+            }
+
+            if (empty($field['key'])) {
+                $errors[] = "{$fieldName}: Key is required";
+            } else {
+                // Check for duplicate keys
+                if (in_array($field['key'], $usedKeys)) {
+                    $errors[] = "{$fieldName}: Duplicate key '{$field['key']}'";
+                }
+                $usedKeys[] = $field['key'];
+
+                // Check key format
+                if (!preg_match('/^[a-z0-9_]+$/', $field['key'])) {
+                    $errors[] = "{$fieldName}: Key '{$field['key']}' contains invalid characters";
+                }
+            }
+
+            // Check type validity
+            $validTypes = ['text', 'email', 'number', 'date', 'textarea', 'select', 'radio', 'checkbox', 'tel'];
+            if (!in_array($field['type'] ?? '', $validTypes)) {
+                $errors[] = "{$fieldName}: Invalid field type";
+            }
+
+            // Check options for select/radio/checkbox
+            if (in_array($field['type'] ?? '', ['select', 'radio', 'checkbox'])) {
+                if (empty($field['options']) || !is_array($field['options'])) {
+                    $errors[] = "{$fieldName}: Options are required for {$field['type']} fields";
+                } else {
+                    foreach ($field['options'] as $optIndex => $option) {
+                        if (!is_array($option) || empty($option['value']) || empty($option['label'])) {
+                            $errors[] = "{$fieldName}, Option " . ($optIndex + 1) . ": Value and label are required";
+                        }
+                    }
+                }
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Validate documents data integrity
+     */
+    public function validateDocumentsIntegrity()
+    {
+        $errors = [];
+        $usedKeys = [];
+
+        foreach ($this->required_documents as $index => $document) {
+            $docName = "Document " . ($index + 1);
+
+            // Check required properties
+            if (empty($document['name'])) {
+                $errors[] = "{$docName}: Name is required";
+            }
+
+            if (empty($document['key'])) {
+                $errors[] = "{$docName}: Key is required";
+            } else {
+                // Check for duplicate keys
+                if (in_array($document['key'], $usedKeys)) {
+                    $errors[] = "{$docName}: Duplicate key '{$document['key']}'";
+                }
+                $usedKeys[] = $document['key'];
+
+                // Check key format
+                if (!preg_match('/^[a-z0-9_]+$/', $document['key'])) {
+                    $errors[] = "{$docName}: Key '{$document['key']}' contains invalid characters";
+                }
+            }
+
+            // Check formats
+            if (empty($document['formats']) || !is_array($document['formats'])) {
+                $errors[] = "{$docName}: At least one format is required";
+            } else {
+                $validFormats = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'];
+                foreach ($document['formats'] as $format) {
+                    if (!in_array(strtolower($format), $validFormats)) {
+                        $errors[] = "{$docName}: Invalid format '{$format}'";
+                    }
+                }
+            }
+
+            // Check max_size
+            $maxSize = $document['max_size'] ?? 0;
+            if ($maxSize < 1 || $maxSize > 10) {
+                $errors[] = "{$docName}: Max size must be between 1 and 10 MB";
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Get comprehensive validation report
+     */
+    public function getValidationReport()
+    {
+        return [
+            'form_fields_errors' => $this->validateFormFieldsIntegrity(),
+            'documents_errors' => $this->validateDocumentsIntegrity(),
+            'is_valid' => empty($this->validateFormFieldsIntegrity()) && empty($this->validateDocumentsIntegrity())
+        ];
+    }
+
+    /**
+     * Auto-fix common data issues
+     */
+    public function autoFixData()
+    {
+        // Fix form fields
+        $fixedFormFields = $this->processFormFields($this->attributes['form_fields'] ?? []);
+        $this->attributes['form_fields'] = json_encode($fixedFormFields);
+
+        // Fix documents
+        $fixedDocuments = $this->processRequiredDocuments($this->attributes['required_documents'] ?? []);
+        $this->attributes['required_documents'] = json_encode($fixedDocuments);
+
+        return $this;
+    }
+
+    /**
+     * Get field by key
+     */
+    public function getFormFieldByKey($key)
+    {
+        return collect($this->form_fields)->firstWhere('key', $key);
+    }
+
+    /**
+     * Get document by key
+     */
+    public function getDocumentByKey($key)
+    {
+        return collect($this->required_documents)->firstWhere('key', $key);
+    }
+
+    /**
+     * Check if field exists
+     */
+    public function hasFormField($key)
+    {
+        return !is_null($this->getFormFieldByKey($key));
+    }
+
+    /**
+     * Check if document exists
+     */
+    public function hasDocument($key)
+    {
+        return !is_null($this->getDocumentByKey($key));
     }
 }
