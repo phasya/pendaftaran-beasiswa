@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up()
     {
-        Schema::create('beasiswas', function (Blueprint $table) {
+        Schema::create('pendaftars', function (Blueprint $table) {
             $table->id();
             $table->string('nama_beasiswa');
             $table->text('deskripsi');
@@ -24,6 +24,6 @@ return new class extends Migration {
 
     public function down()
     {
-        Schema::dropIfExists('beasiswas');
+        Schema::dropIfExists('pendaftars');
     }
 };

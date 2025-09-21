@@ -1124,6 +1124,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         documentsContainer.appendChild(clone);
+        documentsContainer.appendChild(clone);
 
         const newDocData = data || {
             name: '',
@@ -1136,6 +1137,8 @@ document.addEventListener('DOMContentLoaded', function () {
             required: true
         };
 
+        documentsData.push(newDocData);
+        updateDocumentsVisibility();
         documentsData.push(newDocData);
         updateDocumentsVisibility();
 
@@ -1185,7 +1188,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 updatePreview();
             }
         }
+                updatePreview();
+            }
+        }
 
+        function updatePreview() {
+            const data = documentsData[index];
+            if (!data) return;
         function updatePreview() {
             const data = documentsData[index];
             if (!data) return;
@@ -1221,6 +1230,9 @@ document.addEventListener('DOMContentLoaded', function () {
         formatCheckboxes.forEach(checkbox => {
             checkbox.addEventListener('change', updateDocumentData);
         });
+        formatCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', updateDocumentData);
+        });
 
         removeBtn.addEventListener('click', () => {
             if (confirm('Yakin ingin hapus dokumen ini?')) {
@@ -1241,6 +1253,13 @@ document.addEventListener('DOMContentLoaded', function () {
         documentElement.querySelector('.document-description').value = data.description || '';
         documentElement.querySelector('.document-required').checked = data.required !== false;
 
+        if (data.formats && Array.isArray(data.formats)) {
+            const formatCheckboxes = documentElement.querySelectorAll('.document-format');
+            formatCheckboxes.forEach(checkbox => {
+                checkbox.checked = data.formats.includes(checkbox.value);
+            });
+        }
+    }
         if (data.formats && Array.isArray(data.formats)) {
             const formatCheckboxes = documentElement.querySelectorAll('.document-format');
             formatCheckboxes.forEach(checkbox => {
@@ -1321,6 +1340,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         ];
 
+        defaultDocs.forEach(doc => {
+            documentsData.push(doc);
+        });
         defaultDocs.forEach(doc => {
             documentsData.push(doc);
         });

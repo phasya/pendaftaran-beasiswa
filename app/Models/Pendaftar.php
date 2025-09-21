@@ -4,292 +4,176 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
 
 class Pendaftar extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'user_id',
         'beasiswa_id',
-        'form_data',
+        'nama_lengkap',
+        'nim',
+        'email',
+        'no_hp',
+        'fakultas',
+        'jurusan',
+        'semester',
+        'ipk',
+        'alasan_mendaftar',
         'uploaded_documents',
         'status',
-        'submitted_at',
-        'reviewed_at',
-        'reviewed_by',
         'rejection_reason',
-        'notes'
+        'can_resubmit',
+        'rejected_at'
     ];
 
     protected $casts = [
-        'form_data' => 'array',
-        'uploaded_documents' => 'array',
-        'submitted_at' => 'datetime',
-        'reviewed_at' => 'datetime'
+        'can_resubmit' => 'boolean',
+        'rejected_at' => 'datetime',
+        'uploaded_documents' => 'array'
     ];
 
-    // Status constants
-    const STATUS_PENDING = 'pending';
-    const STATUS_REVIEW = 'review';
-    const STATUS_APPROVED = 'approved';
-    const STATUS_REJECTED = 'rejected';
-
-    public static function getStatusOptions()
-    {
-        return [
-            self::STATUS_PENDING => 'Menunggu',
-            self::STATUS_REVIEW => 'Sedang Direview',
-            self::STATUS_APPROVED => 'Disetujui',
-            self::STATUS_REJECTED => 'Ditolak'
-        ];
-    }
-
-    // Relationships
-    public function user()
-    {
-        return $this->belongsTo(User::class);
-    }
-
+    /**
+     * Relationship with Beasiswa
+     */
     public function beasiswa()
     {
         return $this->belongsTo(Beasiswa::class);
     }
 
-    public function reviewer()
-    {
-        return $this->belongsTo(User::class, 'reviewed_by');
-    }
-
-    // Accessors & Mutators
-    public function getStatusLabelAttribute()
-    {
-        $statuses = self::getStatusOptions();
-        return $statuses[$this->status] ?? $this->status;
-    }
-
-    public function getStatusColorAttribute()
-    {
-        $colors = [
-            self::STATUS_PENDING => 'warning',
-            self::STATUS_REVIEW => 'info',
-            self::STATUS_APPROVED => 'success',
-            self::STATUS_REJECTED => 'danger'
-        ];
-
-        return $colors[$this->status] ?? 'secondary';
-    }
-
-    // Helper Methods
-    public function isPending()
-    {
-        return $this->status === self::STATUS_PENDING;
-    }
-
-    public function isUnderReview()
-    {
-        return $this->status === self::STATUS_REVIEW;
-    }
-
-    public function isApproved()
-    {
-        return $this->status === self::STATUS_APPROVED;
-    }
-
+    /**
+     * Check if this application was rejected
+     */
     public function isRejected()
     {
-        return $this->status === self::STATUS_REJECTED;
-    }
-
-    public function canBeEdited()
-    {
-        return $this->isPending() || $this->isRejected();
+        return $this->status === 'ditolak';
     }
 
     /**
-     * Get form data value by key
+     * Check if user can resubmit after rejection
      */
-    public function getFormDataValue($key, $default = null)
+    public function canResubmit()
     {
-        return $this->form_data[$key] ?? $default;
+        return $this->isRejected() && $this->can_resubmit;
     }
 
     /**
-     * Get uploaded document info
+     * Get formatted rejection date
      */
-    public function getDocumentInfo($documentKey)
+    public function getRejectionDateAttribute()
     {
-        return $this->uploaded_documents[$documentKey] ?? null;
+        return $this->rejected_at ? $this->rejected_at->format('d M Y H:i') : null;
     }
 
     /**
-     * Check if document exists
+     * Get uploaded documents with proper formatting
      */
-    public function hasDocument($documentKey)
+    public function getUploadedDocumentsAttribute($value)
     {
-        return isset($this->uploaded_documents[$documentKey]);
+        $decoded = json_decode($value, true);
+        return is_array($decoded) ? $decoded : [];
     }
 
     /**
-     * Get document URL for viewing/downloading
+     * Get document by key
      */
-    public function getDocumentUrl($documentKey)
+    public function getDocument($key)
     {
-        if (!$this->hasDocument($documentKey)) {
-            return null;
+        return $this->uploaded_documents[$key] ?? null;
+    }
+
+    /**
+     * Set document
+     */
+    public function setDocument($key, $filename)
+    {
+        $documents = $this->uploaded_documents;
+        $documents[$key] = $filename;
+        $this->uploaded_documents = $documents;
+    }
+
+    /**
+     * Remove document
+     */
+    public function removeDocument($key)
+    {
+        $documents = $this->uploaded_documents;
+        unset($documents[$key]);
+        $this->uploaded_documents = $documents;
+    }
+
+    /**
+     * Check if has all required documents
+     */
+    public function hasAllRequiredDocuments()
+    {
+        if (!$this->beasiswa || !$this->beasiswa->required_documents) {
+            return false;
         }
 
-        $document = $this->uploaded_documents[$documentKey];
-        return asset('storage/' . $document['path']);
-    }
-
-    /**
-     * Get formatted file size
-     */
-    public function getFormattedFileSize($documentKey)
-    {
-        if (!$this->hasDocument($documentKey)) {
-            return null;
-        }
-
-        $bytes = $this->uploaded_documents[$documentKey]['size'] ?? 0;
-        
-        if ($bytes === 0) return '0 Bytes';
-        
-        $k = 1024;
-        $sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        $i = floor(log($bytes) / log($k));
-        
-        return round($bytes / pow($k, $i), 2) . ' ' . $sizes[$i];
-    }
-
-    /**
-     * Get all form data formatted for display
-     */
-    public function getFormattedFormData()
-    {
-        if (!$this->beasiswa) {
-            return $this->form_data;
-        }
-
-        $formatted = [];
-        
-        foreach ($this->beasiswa->form_fields as $field) {
-            $key = $field['key'];
-            $value = $this->getFormDataValue($key);
-            
-            if ($value !== null && $value !== '') {
-                $formatted[] = [
-                    'label' => $field['name'],
-                    'value' => $this->formatFieldValue($field, $value),
-                    'icon' => $field['icon'] ?? 'fas fa-info',
-                    'type' => $field['type']
-                ];
+        foreach ($this->beasiswa->required_documents as $document) {
+            if ($document['required'] && empty($this->getDocument($document['key']))) {
+                return false;
             }
         }
 
-        return $formatted;
+        return true;
     }
 
     /**
-     * Format field value for display
+     * Get missing required documents
      */
-    private function formatFieldValue($field, $value)
+    public function getMissingRequiredDocuments()
     {
-        switch ($field['type']) {
-            case 'select':
-            case 'radio':
-                if (isset($field['options'])) {
-                    foreach ($field['options'] as $option) {
-                        if ($option['value'] == $value) {
-                            return $option['label'];
-                        }
-                    }
-                }
-                return $value;
-                
-            case 'checkbox':
-                if (is_array($value) && isset($field['options'])) {
-                    $labels = [];
-                    foreach ($field['options'] as $option) {
-                        if (in_array($option['value'], $value)) {
-                            $labels[] = $option['label'];
-                        }
-                    }
-                    return implode(', ', $labels);
-                }
-                return is_array($value) ? implode(', ', $value) : $value;
-                
-            case 'date':
-                try {
-                    return \Carbon\Carbon::parse($value)->format('d M Y');
-                } catch (\Exception $e) {
-                    return $value;
-                }
-                
-            case 'number':
-                if ($field['key'] === 'ipk') {
-                    return number_format(floatval($value), 2);
-                }
-                return number_format(intval($value));
-                
-            case 'textarea':
-                return nl2br(e($value));
-                
-            default:
-                return $value;
+        $missing = [];
+
+        if (!$this->beasiswa || !$this->beasiswa->required_documents) {
+            return $missing;
         }
+
+        foreach ($this->beasiswa->required_documents as $document) {
+            if ($document['required'] && empty($this->getDocument($document['key']))) {
+                $missing[] = $document;
+            }
+        }
+
+        return $missing;
     }
 
     /**
-     * Get document summary for display
+     * Legacy accessors for backward compatibility
      */
-    public function getDocumentSummary()
+    public function getFileTranskripAttribute()
     {
-        if (!$this->beasiswa) {
-            return [];
-        }
-
-        $summary = [];
-        
-        foreach ($this->beasiswa->required_documents as $docConfig) {
-            $key = $docConfig['key'];
-            $hasDoc = $this->hasDocument($key);
-            
-            $summary[] = [
-                'name' => $docConfig['name'],
-                'key' => $key,
-                'icon' => $docConfig['icon'],
-                'color' => $docConfig['color'],
-                'required' => $docConfig['required'],
-                'uploaded' => $hasDoc,
-                'file_info' => $hasDoc ? $this->uploaded_documents[$key] : null,
-                'formatted_size' => $hasDoc ? $this->getFormattedFileSize($key) : null,
-                'url' => $hasDoc ? $this->getDocumentUrl($key) : null
-            ];
-        }
-
-        return $summary;
+        return $this->getDocument('file_transkrip');
     }
 
-    // Scopes
-    public function scopeByStatus($query, $status)
+    public function getFileKtpAttribute()
     {
-        return $query->where('status', $status);
+        return $this->getDocument('file_ktp');
     }
 
-    public function scopeByBeasiswa($query, $beasiswaId)
+    public function getFileKkAttribute()
     {
-        return $query->where('beasiswa_id', $beasiswaId);
+        return $this->getDocument('file_kk');
     }
 
-    public function scopeByUser($query, $userId)
+    /**
+     * Scope untuk get aplikasi yang bisa resubmit
+     */
+    public function scopeCanResubmit($query)
     {
-        return $query->where('user_id', $userId);
+        return $query->where('status', 'ditolak')
+                    ->where('can_resubmit', true);
     }
 
-    public function scopeRecent($query, $days = 30)
+    /**
+     * Scope untuk get aplikasi yang ditolak permanen
+     */
+    public function scopePermanentlyRejected($query)
     {
-        return $query->where('submitted_at', '>=', now()->subDays($days));
+        return $query->where('status', 'ditolak')
+                    ->where('can_resubmit', false);
     }
 }

@@ -2,19 +2,38 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\Request;
 use App\Models\Beasiswa;
 use App\Models\Pendaftar;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class PendaftarController extends Controller
 {
+    public function __construct()
+    {
+        $this->middleware('auth'); // Wajib login
+    }
+
     public function create(Beasiswa $beasiswa)
     {
-        // Check if beasiswa is active
         if (!$beasiswa->isActive()) {
-            return redirect()->route('home')->with('error', 'Beasiswa tidak tersedia atau sudah ditutup.');
+            return redirect()->route('home')
+                           ->with('error', 'Pendaftaran beasiswa sudah ditutup atau tidak aktif.');
+        }
+
+        // Cek berdasarkan email user yang login - hanya cek yang statusnya pending atau diterima
+        $existingApplication = Pendaftar::where('email', Auth::user()->email)
+                                      ->whereIn('status', ['pending', 'diterima'])
+                                      ->first();
+
+        if ($existingApplication) {
+            $beasiswaTerdaftar = Beasiswa::find($existingApplication->beasiswa_id);
+            $statusText = $existingApplication->status == 'pending' ? 'sedang menunggu verifikasi' : 'telah diterima';
+
+            return redirect()->route('home')
+                           ->with('error', 'Anda sudah terdaftar di beasiswa "' . $beasiswaTerdaftar->nama_beasiswa . '" dan ' . $statusText . '.');
         }
 
         return view('pendaftaran.create', compact('beasiswa'));
@@ -22,114 +41,122 @@ class PendaftarController extends Controller
 
     public function store(Request $request, Beasiswa $beasiswa)
     {
-        // Check if beasiswa is still active
         if (!$beasiswa->isActive()) {
-            return redirect()->route('home')->with('error', 'Beasiswa tidak tersedia atau sudah ditutup.');
+            return redirect()->route('home')
+                           ->with('error', 'Pendaftaran beasiswa sudah ditutup atau tidak aktif.');
         }
 
-        // Build dynamic validation rules
-        $rules = [];
-        $messages = [];
+        // Base validation rules
+        $rules = [
+            'nama_lengkap' => 'required|string|max:255',
+            'nim' => [
+                'required',
+                'string',
+                'max:20',
+                Rule::unique('pendaftars', 'nim')->where(function ($query) {
+                    return $query->whereIn('status', ['pending', 'diterima'])
+                                 ->where('email', '!=', Auth::user()->email);
+                })
+            ],
+            'email' => 'required|email|max:255',
+            'no_hp' => 'required|string|max:15',
+            'fakultas' => 'required|string|max:255',
+            'jurusan' => 'required|string|max:255',
+            'semester' => 'required|integer|min:1|max:14',
+            'ipk' => 'required|numeric|min:0|max:4',
+            'alasan_mendaftar' => 'required|string',
+        ];
 
-        // Get form field validation rules from beasiswa configuration
-        $formFieldRules = $beasiswa->getFormFieldValidationRules();
-        $formFieldMessages = $beasiswa->getFormFieldValidationMessages();
-
-        // Get document validation rules from beasiswa configuration
+        // Add dynamic document validation rules
         $documentRules = $beasiswa->getDocumentValidationRules();
+        $rules = array_merge($rules, $documentRules);
+
+        // Custom error messages
+        $messages = [
+            'nim.unique' => 'NIM ini sedang digunakan oleh pendaftar lain dalam beasiswa yang masih aktif.',
+        ];
+
+        // Add dynamic document validation messages
         $documentMessages = $beasiswa->getDocumentValidationMessages();
+        $messages = array_merge($messages, $documentMessages);
 
-        // Merge all validation rules and messages
-        $rules = array_merge($formFieldRules, $documentRules);
-        $messages = array_merge($formFieldMessages, $documentMessages);
-
-        // Additional validation for specific cases
-        $rules['terms'] = 'required|accepted';
-        $messages['terms.required'] = 'Anda harus menyetujui syarat dan ketentuan.';
-        $messages['terms.accepted'] = 'Anda harus menyetujui syarat dan ketentuan.';
-
-        // Validate the request
         $validated = $request->validate($rules, $messages);
 
-        // Remove terms from validated data
-        unset($validated['terms']);
-
-        // Prepare form data
-        $formData = [];
-        foreach ($beasiswa->form_fields as $field) {
-            if (isset($validated[$field['key']])) {
-                $formData[$field['key']] = $validated[$field['key']];
-            }
+        // Pastikan email sama dengan email user yang login
+        if ($validated['email'] !== Auth::user()->email) {
+            return redirect()->back()
+                           ->withInput()
+                           ->with('error', 'Email harus sama dengan email akun Anda.');
         }
 
-        // Handle file uploads
-        $uploadedFiles = [];
+        // Double check - hanya cek yang statusnya pending atau diterima (berdasarkan email)
+        $existingApplicationByEmail = Pendaftar::where('email', Auth::user()->email)
+                                              ->whereIn('status', ['pending', 'diterima'])
+                                              ->first();
+
+        if ($existingApplicationByEmail) {
+            return redirect()->route('home')
+                           ->with('error', 'Anda masih memiliki beasiswa yang aktif.');
+        }
+
+        // Upload and store documents
+        $uploadedDocuments = [];
         foreach ($beasiswa->required_documents as $document) {
-            if ($request->hasFile($document['key'])) {
-                $file = $request->file($document['key']);
+            $key = $document['key'];
 
-                // Generate unique filename
-                $extension = $file->getClientOriginalExtension();
-                $filename = time() . '_' . $document['key'] . '_' . uniqid() . '.' . $extension;
-
-                // Store file in documents directory
-                $path = $file->storeAs('documents/beasiswa_' . $beasiswa->id, $filename, 'public');
-
-                $uploadedFiles[$document['key']] = [
-                    'original_name' => $file->getClientOriginalName(),
-                    'stored_name' => $filename,
-                    'path' => $path,
-                    'size' => $file->getSize(),
-                    'mime_type' => $file->getMimeType()
-                ];
+            if ($request->hasFile($key)) {
+                $file = $request->file($key);
+                $fileName = time() . '_' . $key . '_' . $file->getClientOriginalName();
+                $file->storeAs('public/documents', $fileName);
+                $uploadedDocuments[$key] = $fileName;
             }
         }
 
         // Create pendaftar record
-        $pendaftar = Pendaftar::create([
-            'user_id' => Auth::id(),
+        $pendaftarData = [
             'beasiswa_id' => $beasiswa->id,
-            'form_data' => $formData,
-            'uploaded_documents' => $uploadedFiles,
+            'nama_lengkap' => $validated['nama_lengkap'],
+            'nim' => $validated['nim'],
+            'email' => $validated['email'],
+            'no_hp' => $validated['no_hp'],
+            'fakultas' => $validated['fakultas'],
+            'jurusan' => $validated['jurusan'],
+            'semester' => $validated['semester'],
+            'ipk' => $validated['ipk'],
+            'alasan_mendaftar' => $validated['alasan_mendaftar'],
+            'uploaded_documents' => $uploadedDocuments,
             'status' => 'pending',
-            'submitted_at' => now()
+        ];
+
+        Pendaftar::create($pendaftarData);
+
+        return redirect()->route('home')
+                        ->with('success', 'Pendaftaran beasiswa berhasil!');
+    }
+
+    /**
+     * Method untuk cek status NIM (updated untuk handle resubmit)
+     */
+    public function checkNIMStatus($nim)
+    {
+        $applications = Pendaftar::where('nim', $nim)
+                                ->with('beasiswa')
+                                ->orderBy('created_at', 'desc')
+                                ->get();
+
+        $activeApplication = $applications->whereIn('status', ['pending', 'diterima'])->first();
+        $rejectedApplications = $applications->where('status', 'ditolak');
+        $resubmittableApplications = $rejectedApplications->where('can_resubmit', true);
+
+        return response()->json([
+            'nim' => $nim,
+            'has_active_application' => !is_null($activeApplication),
+            'active_application' => $activeApplication,
+            'total_applications' => $applications->count(),
+            'rejected_applications_count' => $rejectedApplications->count(),
+            'resubmittable_applications_count' => $resubmittableApplications->count(),
+            'can_apply_new' => is_null($activeApplication),
+            'has_resubmittable' => $resubmittableApplications->isNotEmpty(),
         ]);
-
-        return redirect()->route('home')->with('success', 'Pendaftaran berhasil dikirim! Status pendaftaran dapat dilihat di halaman status.');
-    }
-
-    public function show(Pendaftar $pendaftar)
-    {
-        // Authorization check
-        if (Auth::id() !== $pendaftar->user_id) {
-            abort(403, 'Anda tidak memiliki akses ke data ini.');
-        }
-
-        $pendaftar->load('beasiswa', 'user');
-        return view('pendaftaran.show', compact('pendaftar'));
-    }
-
-    public function downloadDocument(Pendaftar $pendaftar, $documentKey)
-    {
-        // Authorization check
-        if (Auth::id() !== $pendaftar->user_id) {
-            abort(403, 'Anda tidak memiliki akses ke file ini.');
-        }
-
-        // Check if document exists
-        if (!isset($pendaftar->uploaded_documents[$documentKey])) {
-            abort(404, 'Dokumen tidak ditemukan.');
-        }
-
-        $document = $pendaftar->uploaded_documents[$documentKey];
-        $filePath = $document['path'];
-
-        // Check if file exists in storage
-        if (!Storage::disk('public')->exists($filePath)) {
-            abort(404, 'File tidak ditemukan di server.');
-        }
-
-        // Return file download response
-        return Storage::disk('public')->download($filePath, $document['original_name']);
     }
 }

@@ -29,15 +29,6 @@ class BeasiswaController extends Controller
             'tanggal_tutup' => 'required|date|after:tanggal_buka',
             'status' => 'required|in:aktif,nonaktif',
             'persyaratan' => 'required|string',
-            'form_fields' => 'required|array|min:1',
-            'form_fields.*.name' => 'required|string|max:255',
-            'form_fields.*.key' => 'required|string|max:100|regex:/^[a-z0-9_]+$/',
-            'form_fields.*.type' => 'required|string|in:text,email,number,date,textarea,select,radio,checkbox,tel',
-            'form_fields.*.icon' => 'required|string|max:100',
-            'form_fields.*.placeholder' => 'nullable|string|max:255',
-            'form_fields.*.position' => 'required|string|in:personal,academic,additional',
-            'form_fields.*.validation' => 'nullable|string|max:255',
-            'form_fields.*.required' => 'boolean',
             'documents' => 'required|array|min:1',
             'documents.*.name' => 'required|string|max:255',
             'documents.*.key' => 'required|string|max:100|regex:/^[a-z0-9_]+$/',
@@ -49,13 +40,6 @@ class BeasiswaController extends Controller
             'documents.*.description' => 'nullable|string|max:255',
             'documents.*.required' => 'boolean',
         ], [
-            'form_fields.required' => 'Minimal harus ada 1 field form yang dikonfigurasi.',
-            'form_fields.*.name.required' => 'Nama field wajib diisi.',
-            'form_fields.*.key.required' => 'Key field wajib diisi.',
-            'form_fields.*.key.regex' => 'Key hanya boleh berisi huruf kecil, angka, dan underscore.',
-            'form_fields.*.type.required' => 'Tipe field wajib dipilih.',
-            'form_fields.*.icon.required' => 'Icon field wajib dipilih.',
-            'form_fields.*.position.required' => 'Posisi field wajib dipilih.',
             'documents.required' => 'Minimal harus ada 1 dokumen yang diperlukan.',
             'documents.*.name.required' => 'Nama dokumen wajib diisi.',
             'documents.*.key.required' => 'Key dokumen wajib diisi.',
@@ -66,54 +50,12 @@ class BeasiswaController extends Controller
             'documents.*.max_size.required' => 'Ukuran maksimal wajib diisi.',
         ]);
 
-        // Validate unique form field keys
-        $formFieldKeys = array_column($validated['form_fields'], 'key');
-        if (count($formFieldKeys) !== count(array_unique($formFieldKeys))) {
-            return redirect()->back()
-                           ->withInput()
-                           ->withErrors(['form_fields' => 'Setiap field form harus memiliki key yang unik.']);
-        }
-
         // Validate unique document keys
         $documentKeys = array_column($validated['documents'], 'key');
         if (count($documentKeys) !== count(array_unique($documentKeys))) {
             return redirect()->back()
                            ->withInput()
                            ->withErrors(['documents' => 'Setiap dokumen harus memiliki key yang unik.']);
-        }
-
-        // Process form fields data
-        $formFields = [];
-        foreach ($validated['form_fields'] as $index => $field) {
-            $fieldData = [
-                'name' => $field['name'],
-                'key' => $field['key'],
-                'type' => $field['type'],
-                'icon' => $field['icon'],
-                'placeholder' => $field['placeholder'] ?? '',
-                'position' => $field['position'],
-                'validation' => $field['validation'] ?? '',
-                'required' => isset($field['required']) && $field['required'] == '1',
-            ];
-
-            // Add options for select/radio/checkbox fields
-            if (in_array($field['type'], ['select', 'radio', 'checkbox'])) {
-                $options = [];
-                if (isset($field['options']) && is_array($field['options'])) {
-                    foreach ($field['options'] as $option) {
-                        if (isset($option['value']) && isset($option['label']) && 
-                            !empty($option['value']) && !empty($option['label'])) {
-                            $options[] = [
-                                'value' => $option['value'],
-                                'label' => $option['label']
-                            ];
-                        }
-                    }
-                }
-                $fieldData['options'] = $options;
-            }
-
-            $formFields[] = $fieldData;
         }
 
         // Process documents data
@@ -131,7 +73,6 @@ class BeasiswaController extends Controller
             ];
         }
 
-        $validated['form_fields'] = $formFields;
         $validated['required_documents'] = $requiredDocuments;
         unset($validated['documents']);
 
@@ -162,15 +103,6 @@ class BeasiswaController extends Controller
             'tanggal_tutup' => 'required|date|after:tanggal_buka',
             'status' => 'required|in:aktif,nonaktif',
             'persyaratan' => 'required|string',
-            'form_fields' => 'required|array|min:1',
-            'form_fields.*.name' => 'required|string|max:255',
-            'form_fields.*.key' => 'required|string|max:100|regex:/^[a-z0-9_]+$/',
-            'form_fields.*.type' => 'required|string|in:text,email,number,date,textarea,select,radio,checkbox,tel',
-            'form_fields.*.icon' => 'required|string|max:100',
-            'form_fields.*.placeholder' => 'nullable|string|max:255',
-            'form_fields.*.position' => 'required|string|in:personal,academic,additional',
-            'form_fields.*.validation' => 'nullable|string|max:255',
-            'form_fields.*.required' => 'boolean',
             'documents' => 'required|array|min:1',
             'documents.*.name' => 'required|string|max:255',
             'documents.*.key' => 'required|string|max:100|regex:/^[a-z0-9_]+$/',
@@ -183,54 +115,12 @@ class BeasiswaController extends Controller
             'documents.*.required' => 'boolean',
         ]);
 
-        // Validate unique form field keys
-        $formFieldKeys = array_column($validated['form_fields'], 'key');
-        if (count($formFieldKeys) !== count(array_unique($formFieldKeys))) {
-            return redirect()->back()
-                           ->withInput()
-                           ->withErrors(['form_fields' => 'Setiap field form harus memiliki key yang unik.']);
-        }
-
         // Validate unique document keys
         $documentKeys = array_column($validated['documents'], 'key');
         if (count($documentKeys) !== count(array_unique($documentKeys))) {
             return redirect()->back()
                            ->withInput()
                            ->withErrors(['documents' => 'Setiap dokumen harus memiliki key yang unik.']);
-        }
-
-        // Process form fields data
-        $formFields = [];
-        foreach ($validated['form_fields'] as $index => $field) {
-            $fieldData = [
-                'name' => $field['name'],
-                'key' => $field['key'],
-                'type' => $field['type'],
-                'icon' => $field['icon'],
-                'placeholder' => $field['placeholder'] ?? '',
-                'position' => $field['position'],
-                'validation' => $field['validation'] ?? '',
-                'required' => isset($field['required']) && $field['required'] == '1',
-            ];
-
-            // Add options for select/radio/checkbox fields
-            if (in_array($field['type'], ['select', 'radio', 'checkbox'])) {
-                $options = [];
-                if (isset($field['options']) && is_array($field['options'])) {
-                    foreach ($field['options'] as $option) {
-                        if (isset($option['value']) && isset($option['label']) && 
-                            !empty($option['value']) && !empty($option['label'])) {
-                            $options[] = [
-                                'value' => $option['value'],
-                                'label' => $option['label']
-                            ];
-                        }
-                    }
-                }
-                $fieldData['options'] = $options;
-            }
-
-            $formFields[] = $fieldData;
         }
 
         // Process documents data
@@ -248,7 +138,6 @@ class BeasiswaController extends Controller
             ];
         }
 
-        $validated['form_fields'] = $formFields;
         $validated['required_documents'] = $requiredDocuments;
         unset($validated['documents']);
 

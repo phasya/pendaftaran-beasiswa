@@ -275,8 +275,10 @@ class Beasiswa extends Model
             return empty($value) ? $this->getDefaultDocuments() : $this->processRequiredDocuments($value);
         }
 
+        // If string (JSON), decode it
         $decoded = json_decode($value, true);
 
+        // Return default documents if none set or invalid
         if (!is_array($decoded) || empty($decoded)) {
             return $this->getDefaultDocuments();
         }
