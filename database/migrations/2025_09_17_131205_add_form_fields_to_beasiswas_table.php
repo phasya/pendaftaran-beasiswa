@@ -11,17 +11,20 @@ return new class extends Migration
      */
     // Migration file: add_dynamic_fields_to_beasiswa_table.php
     public function up()
-    {
-        Schema::table('beasiswa', function (Blueprint $table) {
-            $table->json('form_fields')->nullable();
-            $table->json('documents')->nullable();
-        });
-    }
+{
+    Schema::table('beasiswas', function (Blueprint $table) {
+        $table->json('form_fields')->nullable();
+        $table->json('documents')->nullable();
+    });
+}
 
-    public function down()
-    {
-        Schema::table('beasiswa', function (Blueprint $table) {
-            $table->dropColumn(['form_fields', 'documents']);
-        });
-    }
-};
+public function down()
+{
+    Schema::table('beasiswas', function (Blueprint $table) {
+        $table->dropColumn(['form_fields', 'documents']);
+    });
+}
+    /**
+     * Reverse the migrations.
+     */
+};  

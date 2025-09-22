@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Beasiswa;
+use Carbon\Carbon;
 
 class BeasiswaController extends Controller
 {
@@ -29,53 +30,79 @@ class BeasiswaController extends Controller
             'tanggal_tutup' => 'required|date|after:tanggal_buka',
             'status' => 'required|in:aktif,nonaktif',
             'persyaratan' => 'required|string',
-            'form_fields' => 'required|array|min:1',
-            'form_fields.*.name' => 'required|string|max:255',
-            'form_fields.*.key' => 'nullable|string|max:255',
-            'form_fields.*.type' => 'required|string',
-            'form_fields.*.icon' => 'required|string',
-            'form_fields.*.position' => 'required|string',
-            'form_fields.*.validation' => 'nullable|string',
-            'form_fields.*.placeholder' => 'nullable|string',
-            'form_fields.*.required' => 'required|boolean',
-            'documents' => 'required|array|min:1',
-            'documents.*.name' => 'required|string|max:255',
-            'documents.*.key' => 'nullable|string|max:255',
-            'documents.*.icon' => 'required|string',
-            'documents.*.color' => 'required|string',
-            'documents.*.formats' => 'required|array|min:1',
-            'documents.*.max_size' => 'required|numeric|min:1|max:10',
-            'documents.*.description' => 'nullable|string',
-            'documents.*.required' => 'required|boolean'
+            'form_fields_json' => 'required|string',
+            'required_documents_json' => 'required|string',
         ]);
 
         try {
+            // Decode and validate JSON data
+            $formFields = json_decode($validated['form_fields_json'], true);
+            $requiredDocuments = json_decode($validated['required_documents_json'], true);
+
+            // Check for JSON decode errors
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new \Exception('Format data JSON tidak valid: ' . json_last_error_msg());
+            }
+
+            // Validate decoded data structure
+            if (!is_array($formFields) || empty($formFields)) {
+                throw new \Exception('Data form fields tidak valid atau kosong.');
+            }
+
+            if (!is_array($requiredDocuments) || empty($requiredDocuments)) {
+                throw new \Exception('Data dokumen tidak valid atau kosong.');
+            }
+
             // Process form fields with auto key generation
             $processedFormFields = [];
             $usedFieldKeys = [];
 
-            foreach ($validated['form_fields'] as $field) {
-                if (empty($field['name'])) {
+            foreach ($formFields as $index => $field) {
+                if (!is_array($field) || empty($field['name'])) {
                     continue;
                 }
 
                 // Generate unique key if not provided
                 if (empty($field['key'])) {
-                    $field['key'] = Beasiswa::generateUniqueKey($field['name'], $usedFieldKeys);
+                    $field['key'] = $this->generateUniqueKey($field['name'], $usedFieldKeys);
                 }
 
-                $usedFieldKeys[] = $field['key'];
+                // Ensure key uniqueness
+                $key = $field['key'];
+                $originalKey = $key;
+                $counter = 1;
+                while (in_array($key, $usedFieldKeys)) {
+                    $key = $originalKey . '_' . $counter;
+                    $counter++;
+                }
+                $usedFieldKeys[] = $key;
+
+                // Process options
+                $options = [];
+                if (isset($field['options']) && is_array($field['options'])) {
+                    foreach ($field['options'] as $option) {
+                        if (
+                            isset($option['value'], $option['label']) &&
+                            !empty($option['value']) && !empty($option['label'])
+                        ) {
+                            $options[] = [
+                                'value' => $option['value'],
+                                'label' => $option['label']
+                            ];
+                        }
+                    }
+                }
 
                 $processedFormFields[] = [
                     'name' => $field['name'],
-                    'key' => $field['key'],
+                    'key' => $key,
                     'type' => $field['type'] ?? 'text',
                     'icon' => $field['icon'] ?? 'fas fa-user',
                     'placeholder' => $field['placeholder'] ?? '',
                     'position' => $field['position'] ?? 'personal',
                     'validation' => $field['validation'] ?? '',
                     'required' => (bool) ($field['required'] ?? true),
-                    'options' => $field['options'] ?? []
+                    'options' => $options
                 ];
             }
 
@@ -83,24 +110,32 @@ class BeasiswaController extends Controller
             $processedDocuments = [];
             $usedDocKeys = [];
 
-            foreach ($validated['documents'] as $doc) {
-                if (empty($doc['name'])) {
+            foreach ($requiredDocuments as $index => $doc) {
+                if (!is_array($doc) || empty($doc['name'])) {
                     continue;
                 }
 
                 // Generate unique key if not provided
                 if (empty($doc['key'])) {
-                    $doc['key'] = Beasiswa::generateUniqueKey($doc['name'], $usedDocKeys, 'file');
+                    $doc['key'] = $this->generateUniqueKey($doc['name'], $usedDocKeys, 'file');
                 }
 
-                $usedDocKeys[] = $doc['key'];
+                // Ensure key uniqueness
+                $key = $doc['key'];
+                $originalKey = $key;
+                $counter = 1;
+                while (in_array($key, $usedDocKeys)) {
+                    $key = $originalKey . '_' . $counter;
+                    $counter++;
+                }
+                $usedDocKeys[] = $key;
 
                 $processedDocuments[] = [
                     'name' => $doc['name'],
-                    'key' => $doc['key'],
+                    'key' => $key,
                     'icon' => $doc['icon'] ?? 'fas fa-file',
                     'color' => $doc['color'] ?? 'gray',
-                    'formats' => $doc['formats'] ?? [],
+                    'formats' => $doc['formats'] ?? ['pdf'],
                     'max_size' => (int) ($doc['max_size'] ?? 5),
                     'description' => $doc['description'] ?? '',
                     'required' => (bool) ($doc['required'] ?? true)
@@ -116,14 +151,26 @@ class BeasiswaController extends Controller
                 'tanggal_tutup' => $validated['tanggal_tutup'],
                 'status' => $validated['status'],
                 'persyaratan' => $validated['persyaratan'],
-                'form_fields' => json_encode($processedFormFields),
-                'required_documents' => json_encode($processedDocuments)
+                'form_fields' => $processedFormFields,
+                'required_documents' => $processedDocuments
+            ]);
+
+            \Log::info('Beasiswa created successfully', [
+                'id' => $beasiswa->id,
+                'form_fields_count' => count($processedFormFields),
+                'documents_count' => count($processedDocuments)
             ]);
 
             return redirect()->route('admin.beasiswa.index')
                 ->with('success', 'Beasiswa berhasil ditambahkan!');
 
         } catch (\Exception $e) {
+            \Log::error('Error creating beasiswa: ' . $e->getMessage(), [
+                'request_data' => $request->only(['nama_beasiswa', 'status']),
+                'form_fields_json_length' => strlen($request->form_fields_json ?? ''),
+                'required_documents_json_length' => strlen($request->required_documents_json ?? '')
+            ]);
+
             return back()
                 ->withErrors(['error' => 'Terjadi kesalahan saat menyimpan data: ' . $e->getMessage()])
                 ->withInput();
@@ -142,10 +189,7 @@ class BeasiswaController extends Controller
 
     public function update(Request $request, Beasiswa $beasiswa)
     {
-        // Debug log untuk melihat data yang masuk
-        \Log::info('Update Request Data:', $request->all());
-
-        // Validation rules yang disesuaikan dengan JavaScript
+        // First validate the basic fields and JSON strings
         $validated = $request->validate([
             'nama_beasiswa' => 'required|string|max:255',
             'deskripsi' => 'required|string',
@@ -154,153 +198,165 @@ class BeasiswaController extends Controller
             'tanggal_tutup' => 'required|date|after:tanggal_buka',
             'status' => 'required|in:aktif,nonaktif',
             'persyaratan' => 'required|string',
-
-            // Form fields validation - disesuaikan dengan data dari JavaScript
-            'form_fields' => 'required|array|min:1',
-            'form_fields.*.name' => 'required|string|max:255',
-            'form_fields.*.key' => 'nullable|string|max:255',
-            'form_fields.*.type' => 'required|string',
-            'form_fields.*.icon' => 'required|string',
-            'form_fields.*.placeholder' => 'nullable|string',
-            'form_fields.*.position' => 'required|string',
-            'form_fields.*.validation' => 'nullable|string',
-            'form_fields.*.required' => 'required|in:0,1', // Accept string 0/1
-            'form_fields.*.options' => 'nullable|array',
-            'form_fields.*.options.*.value' => 'nullable|string',
-            'form_fields.*.options.*.label' => 'nullable|string',
-
-            // Documents validation - disesuaikan dengan data dari JavaScript
-            'documents' => 'required|array|min:1',
-            'documents.*.name' => 'required|string|max:255',
-            'documents.*.key' => 'nullable|string|max:255',
-            'documents.*.icon' => 'required|string',
-            'documents.*.color' => 'required|string',
-            'documents.*.formats' => 'required|array|min:1',
-            'documents.*.max_size' => 'required|numeric|min:1|max:10',
-            'documents.*.description' => 'nullable|string',
-            'documents.*.required' => 'required|in:0,1' // Accept string 0/1
+            'form_fields_json' => 'required|string',
+            'required_documents_json' => 'required|string',
         ]);
 
         try {
-            // Process form fields with better error handling
+            // Decode and validate JSON data
+            $formFields = json_decode($validated['form_fields_json'], true);
+            $requiredDocuments = json_decode($validated['required_documents_json'], true);
+
+            // Check for JSON decode errors
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new \Exception('Format data JSON tidak valid: ' . json_last_error_msg());
+            }
+
+            // Validate decoded data structure
+            if (!is_array($formFields) || empty($formFields)) {
+                throw new \Exception('Data form fields tidak valid atau kosong.');
+            }
+
+            if (!is_array($requiredDocuments) || empty($requiredDocuments)) {
+                throw new \Exception('Data dokumen tidak valid atau kosong.');
+            }
+
+            // Validate each form field
+            foreach ($formFields as $index => $field) {
+                if (!is_array($field)) {
+                    throw new \Exception("Form field ke-" . ($index + 1) . " bukan array yang valid.");
+                }
+
+                // Check required fields
+                $requiredFieldKeys = ['name', 'key', 'type', 'icon', 'position'];
+                foreach ($requiredFieldKeys as $key) {
+                    if (!isset($field[$key]) || empty($field[$key])) {
+                        throw new \Exception("Form field ke-" . ($index + 1) . ": {$key} tidak boleh kosong.");
+                    }
+                }
+
+                // Validate field type
+                $allowedTypes = ['text', 'email', 'number', 'date', 'textarea', 'select', 'radio', 'checkbox', 'tel'];
+                if (!in_array($field['type'], $allowedTypes)) {
+                    throw new \Exception("Form field ke-" . ($index + 1) . ": tipe '{$field['type']}' tidak valid.");
+                }
+
+                // Validate options for select/radio/checkbox
+                if (in_array($field['type'], ['select', 'radio', 'checkbox'])) {
+                    if (!isset($field['options']) || !is_array($field['options']) || empty($field['options'])) {
+                        throw new \Exception("Form field ke-" . ($index + 1) . ": opsi pilihan harus diisi untuk tipe {$field['type']}.");
+                    }
+                }
+            }
+
+            // Validate each document
+            foreach ($requiredDocuments as $index => $doc) {
+                if (!is_array($doc)) {
+                    throw new \Exception("Dokumen ke-" . ($index + 1) . " bukan array yang valid.");
+                }
+
+                // Check required fields
+                $requiredDocKeys = ['name', 'key', 'icon', 'color', 'formats', 'max_size'];
+                foreach ($requiredDocKeys as $key) {
+                    if (
+                        !isset($doc[$key]) ||
+                        (is_array($doc[$key]) ? empty($doc[$key]) : empty($doc[$key]))
+                    ) {
+                        throw new \Exception("Dokumen ke-" . ($index + 1) . ": {$key} tidak boleh kosong.");
+                    }
+                }
+
+                // Validate formats
+                if (!is_array($doc['formats']) || empty($doc['formats'])) {
+                    throw new \Exception("Dokumen ke-" . ($index + 1) . ": format file harus dipilih minimal 1.");
+                }
+
+                $allowedFormats = ['jpg', 'jpeg', 'png', 'pdf'];
+                foreach ($doc['formats'] as $format) {
+                    if (!in_array(strtolower($format), $allowedFormats)) {
+                        throw new \Exception("Dokumen ke-" . ($index + 1) . ": format '{$format}' tidak diperbolehkan.");
+                    }
+                }
+
+                // Validate max size
+                if (!is_numeric($doc['max_size']) || $doc['max_size'] < 1 || $doc['max_size'] > 10) {
+                    throw new \Exception("Dokumen ke-" . ($index + 1) . ": ukuran maksimal harus antara 1-10 MB.");
+                }
+            }
+
+            // Process and clean the data
             $processedFormFields = [];
             $usedFieldKeys = [];
 
-            if (!empty($validated['form_fields'])) {
-                foreach ($validated['form_fields'] as $index => $field) {
-                    // Skip empty fields
-                    if (empty($field['name']) || empty($field['type'])) {
-                        \Log::warning("Skipping form field at index {$index}: missing name or type", $field);
-                        continue;
-                    }
+            foreach ($formFields as $field) {
+                // Generate unique key if needed
+                $key = $field['key'];
+                $originalKey = $key;
+                $counter = 1;
+                while (in_array($key, $usedFieldKeys)) {
+                    $key = $originalKey . '_' . $counter;
+                    $counter++;
+                }
+                $usedFieldKeys[] = $key;
 
-                    // Generate unique key if not provided
-                    if (empty($field['key'])) {
-                        $field['key'] = Beasiswa::generateUniqueKey($field['name'], $usedFieldKeys);
-                    }
-
-                    // Ensure key uniqueness
-                    $originalKey = $field['key'];
-                    $counter = 1;
-                    while (in_array($field['key'], $usedFieldKeys)) {
-                        $field['key'] = $originalKey . '_' . $counter;
-                        $counter++;
-                    }
-                    $usedFieldKeys[] = $field['key'];
-
-                    // Process options if they exist
-                    $processedOptions = [];
-                    if (!empty($field['options']) && is_array($field['options'])) {
-                        foreach ($field['options'] as $option) {
-                            if (!empty($option['value']) && !empty($option['label'])) {
-                                $processedOptions[] = [
-                                    'value' => $option['value'],
-                                    'label' => $option['label']
-                                ];
-                            }
+                // Process options
+                $options = [];
+                if (isset($field['options']) && is_array($field['options'])) {
+                    foreach ($field['options'] as $option) {
+                        if (
+                            isset($option['value'], $option['label']) &&
+                            !empty($option['value']) && !empty($option['label'])
+                        ) {
+                            $options[] = [
+                                'value' => $option['value'],
+                                'label' => $option['label']
+                            ];
                         }
                     }
-
-                    $processedFormFields[] = [
-                        'name' => $field['name'],
-                        'key' => $field['key'],
-                        'type' => $field['type'],
-                        'icon' => $field['icon'] ?? 'fas fa-user',
-                        'placeholder' => $field['placeholder'] ?? '',
-                        'position' => $field['position'] ?? 'personal',
-                        'validation' => $field['validation'] ?? '',
-                        'required' => ($field['required'] === '1' || $field['required'] === 1 || $field['required'] === true),
-                        'options' => $processedOptions
-                    ];
                 }
+
+                $processedFormFields[] = [
+                    'name' => $field['name'],
+                    'key' => $key,
+                    'type' => $field['type'],
+                    'icon' => $field['icon'],
+                    'placeholder' => $field['placeholder'] ?? '',
+                    'position' => $field['position'],
+                    'validation' => $field['validation'] ?? '',
+                    'required' => (bool) ($field['required'] ?? true),
+                    'options' => $options
+                ];
             }
 
-            // Process documents with better error handling
+            // Process documents
             $processedDocuments = [];
             $usedDocKeys = [];
 
-            if (!empty($validated['documents'])) {
-                foreach ($validated['documents'] as $index => $doc) {
-                    // Skip empty documents
-                    if (empty($doc['name']) || empty($doc['formats'])) {
-                        \Log::warning("Skipping document at index {$index}: missing name or formats", $doc);
-                        continue;
-                    }
-
-                    // Generate unique key if not provided
-                    if (empty($doc['key'])) {
-                        $doc['key'] = Beasiswa::generateUniqueKey($doc['name'], $usedDocKeys, 'file');
-                    }
-
-                    // Ensure key uniqueness
-                    $originalKey = $doc['key'];
-                    $counter = 1;
-                    while (in_array($doc['key'], $usedDocKeys)) {
-                        $doc['key'] = $originalKey . '_' . $counter;
-                        $counter++;
-                    }
-                    $usedDocKeys[] = $doc['key'];
-
-                    // Process formats array
-                    $processedFormats = [];
-                    if (is_array($doc['formats'])) {
-                        $processedFormats = array_filter($doc['formats'], function ($format) {
-                            return in_array(strtolower($format), ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx']);
-                        });
-                    }
-
-                    if (empty($processedFormats)) {
-                        $processedFormats = ['pdf']; // Default format
-                    }
-
-                    $processedDocuments[] = [
-                        'name' => $doc['name'],
-                        'key' => $doc['key'],
-                        'icon' => $doc['icon'] ?? 'fas fa-file',
-                        'color' => $doc['color'] ?? 'gray',
-                        'formats' => array_values($processedFormats),
-                        'max_size' => max(1, min(10, (int) ($doc['max_size'] ?? 5))),
-                        'description' => $doc['description'] ?? '',
-                        'required' => ($doc['required'] === '1' || $doc['required'] === 1 || $doc['required'] === true)
-                    ];
+            foreach ($requiredDocuments as $doc) {
+                // Generate unique key if needed
+                $key = $doc['key'];
+                $originalKey = $key;
+                $counter = 1;
+                while (in_array($key, $usedDocKeys)) {
+                    $key = $originalKey . '_' . $counter;
+                    $counter++;
                 }
-            }
+                $usedDocKeys[] = $key;
 
-            // Validate that we have processed data
-            if (empty($processedFormFields)) {
-                throw new \Exception('No valid form fields were processed');
+                $processedDocuments[] = [
+                    'name' => $doc['name'],
+                    'key' => $key,
+                    'icon' => $doc['icon'],
+                    'color' => $doc['color'],
+                    'formats' => array_map('strtolower', $doc['formats']),
+                    'max_size' => (int) $doc['max_size'],
+                    'description' => $doc['description'] ?? '',
+                    'required' => (bool) ($doc['required'] ?? true)
+                ];
             }
-
-            if (empty($processedDocuments)) {
-                throw new \Exception('No valid documents were processed');
-            }
-
-            // Log processed data for debugging
-            \Log::info('Processed Form Fields:', $processedFormFields);
-            \Log::info('Processed Documents:', $processedDocuments);
 
             // Update the beasiswa record
-            $updateData = [
+            $beasiswa->update([
                 'nama_beasiswa' => $validated['nama_beasiswa'],
                 'deskripsi' => $validated['deskripsi'],
                 'jumlah_dana' => $validated['jumlah_dana'],
@@ -308,40 +364,31 @@ class BeasiswaController extends Controller
                 'tanggal_tutup' => $validated['tanggal_tutup'],
                 'status' => $validated['status'],
                 'persyaratan' => $validated['persyaratan'],
-                'form_fields' => $processedFormFields, // Let model handle JSON encoding
-                'required_documents' => $processedDocuments // Let model handle JSON encoding
-            ];
+                'form_fields' => $processedFormFields,  // Model will cast to JSON
+                'required_documents' => $processedDocuments,  // Model will cast to JSON
+            ]);
 
-            $beasiswa->update($updateData);
-
-            \Log::info('Beasiswa updated successfully', ['id' => $beasiswa->id]);
-
-            // Handle AJAX requests
-            if ($request->wantsJson() || $request->ajax()) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Beasiswa berhasil diperbarui!',
-                    'redirect' => route('admin.beasiswa.index')
-                ]);
-            }
+            // Log success for debugging
+            \Log::info('Beasiswa updated successfully', [
+                'id' => $beasiswa->id,
+                'form_fields_count' => count($processedFormFields),
+                'documents_count' => count($processedDocuments)
+            ]);
 
             return redirect()->route('admin.beasiswa.index')
                 ->with('success', 'Beasiswa berhasil diperbarui!');
 
         } catch (\Exception $e) {
-            \Log::error('Error updating beasiswa:', [
+            // Log the error with full context
+            \Log::error('Error updating beasiswa', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
-                'request_data' => $request->all()
+                'request_data' => [
+                    'form_fields_json_length' => strlen($request->form_fields_json ?? ''),
+                    'required_documents_json_length' => strlen($request->required_documents_json ?? ''),
+                    'basic_fields' => $request->only(['nama_beasiswa', 'status'])
+                ]
             ]);
-
-            // Handle AJAX requests
-            if ($request->wantsJson() || $request->ajax()) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Terjadi kesalahan saat memperbarui data: ' . $e->getMessage()
-                ], 422);
-            }
 
             return back()
                 ->withErrors(['error' => 'Terjadi kesalahan saat memperbarui data: ' . $e->getMessage()])
@@ -361,17 +408,24 @@ class BeasiswaController extends Controller
         }
     }
 
-    // Rest of methods remain the same...
     public function clean(Request $request, Beasiswa $beasiswa)
     {
         try {
-            $originalFormFields = count($beasiswa->getRawRequiredDocumentsAttribute() ?? []);
-            $originalDocuments = count($beasiswa->getRawRequiredDocumentsAttribute() ?? []);
+            $originalFormFields = count($beasiswa->form_fields ?? []);
+            $originalDocuments = count($beasiswa->required_documents ?? []);
 
-            $beasiswa->cleanDuplicateData();
+            // Clean duplicate form fields
+            $cleanFormFields = $this->removeDuplicates($beasiswa->form_fields ?? [], 'key');
+            $cleanDocuments = $this->removeDuplicates($beasiswa->required_documents ?? [], 'key');
 
-            $cleanedFormFields = count($beasiswa->form_fields);
-            $cleanedDocuments = count($beasiswa->required_documents);
+            // Update the beasiswa
+            $beasiswa->update([
+                'form_fields' => $cleanFormFields,
+                'required_documents' => $cleanDocuments
+            ]);
+
+            $cleanedFormFields = count($cleanFormFields);
+            $cleanedDocuments = count($cleanDocuments);
 
             $removedFormFields = $originalFormFields - $cleanedFormFields;
             $removedDocuments = $originalDocuments - $cleanedDocuments;
@@ -413,55 +467,13 @@ class BeasiswaController extends Controller
                 'summary' => []
             ];
 
-            $formFields = $beasiswa->getRawRequiredDocumentsAttribute() ?? [];
-            $fieldNames = [];
-            $fieldKeys = [];
-            $duplicateFormFields = [];
+            // Analyze form fields
+            $formFields = $beasiswa->form_fields ?? [];
+            $duplicateFormFields = $this->findDuplicates($formFields, 'key');
 
-            foreach ($formFields as $index => $field) {
-                if (!is_array($field))
-                    continue;
-
-                $name = strtolower(trim($field['name'] ?? ''));
-                $key = trim($field['key'] ?? '');
-
-                if (in_array($name, $fieldNames) || in_array($key, $fieldKeys)) {
-                    $duplicateFormFields[] = [
-                        'index' => $index,
-                        'name' => $field['name'] ?? '',
-                        'key' => $field['key'] ?? '',
-                        'duplicate_type' => in_array($name, $fieldNames) ? 'name' : 'key'
-                    ];
-                }
-
-                $fieldNames[] = $name;
-                $fieldKeys[] = $key;
-            }
-
-            $documents = $beasiswa->getRawRequiredDocumentsAttribute() ?? [];
-            $docNames = [];
-            $docKeys = [];
-            $duplicateDocuments = [];
-
-            foreach ($documents as $index => $doc) {
-                if (!is_array($doc))
-                    continue;
-
-                $name = strtolower(trim($doc['name'] ?? ''));
-                $key = trim($doc['key'] ?? '');
-
-                if (in_array($name, $docNames) || in_array($key, $docKeys)) {
-                    $duplicateDocuments[] = [
-                        'index' => $index,
-                        'name' => $doc['name'] ?? '',
-                        'key' => $doc['key'] ?? '',
-                        'duplicate_type' => in_array($name, $docNames) ? 'name' : 'key'
-                    ];
-                }
-
-                $docNames[] = $name;
-                $docKeys[] = $key;
-            }
+            // Analyze documents
+            $documents = $beasiswa->required_documents ?? [];
+            $duplicateDocuments = $this->findDuplicates($documents, 'key');
 
             $analysis['form_fields'] = $duplicateFormFields;
             $analysis['documents'] = $duplicateDocuments;
@@ -497,21 +509,23 @@ class BeasiswaController extends Controller
 
             foreach ($beasiswas as $beasiswa) {
                 try {
-                    $originalFields = count($beasiswa->getRawRequiredDocumentsAttribute() ?? []);
-                    $originalDocs = count($beasiswa->getRawRequiredDocumentsAttribute() ?? []);
+                    $originalFields = count($beasiswa->form_fields ?? []);
+                    $originalDocs = count($beasiswa->required_documents ?? []);
 
-                    $beasiswa->cleanDuplicateData();
+                    // Clean duplicates
+                    $cleanFormFields = $this->removeDuplicates($beasiswa->form_fields ?? [], 'key');
+                    $cleanDocuments = $this->removeDuplicates($beasiswa->required_documents ?? [], 'key');
 
-                    $cleanedFields = count($beasiswa->form_fields);
-                    $cleanedDocs = count($beasiswa->required_documents);
+                    // Update if there were changes
+                    if (count($cleanFormFields) !== $originalFields || count($cleanDocuments) !== $originalDocs) {
+                        $beasiswa->update([
+                            'form_fields' => $cleanFormFields,
+                            'required_documents' => $cleanDocuments
+                        ]);
 
-                    $removedFields = $originalFields - $cleanedFields;
-                    $removedDocs = $originalDocs - $cleanedDocs;
-
-                    if ($removedFields > 0 || $removedDocs > 0) {
                         $totalCleaned++;
-                        $totalRemovedFields += $removedFields;
-                        $totalRemovedDocs += $removedDocs;
+                        $totalRemovedFields += ($originalFields - count($cleanFormFields));
+                        $totalRemovedDocs += ($originalDocs - count($cleanDocuments));
                     }
 
                 } catch (\Exception $e) {
@@ -548,5 +562,80 @@ class BeasiswaController extends Controller
                 'message' => 'Terjadi kesalahan saat bulk cleaning: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    // Helper method for generating unique keys
+    private function generateUniqueKey($name, $usedKeys, $prefix = '')
+    {
+        $baseKey = strtolower(trim($name));
+        $baseKey = preg_replace('/[^a-z0-9\s]/', '', $baseKey);
+        $baseKey = preg_replace('/\s+/', '_', $baseKey);
+        $baseKey = substr($baseKey, 0, 30);
+
+        if (empty($baseKey)) {
+            $baseKey = $prefix ? 'dokumen' : 'field';
+        }
+
+        if ($prefix) {
+            $baseKey = $prefix . '_' . $baseKey;
+        }
+
+        $key = $baseKey;
+        $counter = 1;
+
+        while (in_array($key, $usedKeys)) {
+            $key = $baseKey . '_' . $counter;
+            $counter++;
+        }
+
+        return $key;
+    }
+
+    // Helper method to find duplicates
+    private function findDuplicates($items, $keyField)
+    {
+        $seen = [];
+        $duplicates = [];
+
+        foreach ($items as $index => $item) {
+            if (!is_array($item) || !isset($item[$keyField])) {
+                continue;
+            }
+
+            $key = $item[$keyField];
+            if (in_array($key, $seen)) {
+                $duplicates[] = [
+                    'index' => $index,
+                    'name' => $item['name'] ?? '',
+                    'key' => $key,
+                    'duplicate_type' => 'key'
+                ];
+            } else {
+                $seen[] = $key;
+            }
+        }
+
+        return $duplicates;
+    }
+
+    // Helper method to remove duplicates
+    private function removeDuplicates($items, $keyField)
+    {
+        $seen = [];
+        $cleaned = [];
+
+        foreach ($items as $item) {
+            if (!is_array($item) || !isset($item[$keyField])) {
+                continue;
+            }
+
+            $key = $item[$keyField];
+            if (!in_array($key, $seen)) {
+                $seen[] = $key;
+                $cleaned[] = $item;
+            }
+        }
+
+        return $cleaned;
     }
 }

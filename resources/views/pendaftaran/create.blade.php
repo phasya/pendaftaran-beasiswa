@@ -161,6 +161,7 @@
     /* File Upload Enhancements */
     .file-upload-card {
         transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        cursor: pointer;
     }
     
     .file-upload-card:hover {
@@ -169,8 +170,19 @@
     }
     
     .file-upload-card.uploaded {
-        border-color: #22c55e;
-        background-color: #f0fdf4;
+        border-color: #22c55e !important;
+        background-color: #f0fdf4 !important;
+    }
+    
+    .file-upload-area {
+        cursor: pointer;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
     }
     
     /* Error message styles */
@@ -189,6 +201,43 @@
         display: flex;
         align-items: center;
     }
+
+    /* Radio button custom styling */
+    .radio-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .checkbox-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    /* File input override */
+    .file-input-hidden {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        padding: 0 !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+    }
+
+    /* Debug helper */
+    .debug-info {
+        background: #f3f4f6;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        padding: 12px;
+        margin: 16px 0;
+        font-size: 12px;
+        color: #6b7280;
+    }
 </style>
 
 <div class="container mx-auto px-4 py-8">
@@ -200,6 +249,40 @@
             </h2>
             <p class="text-amber-700 text-lg">Lengkapi formulir di bawah untuk mendaftar beasiswa</p>
         </div>
+
+        <!-- Show validation errors if any -->
+        @if ($errors->any())
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                <h4 class="text-red-800 font-semibold mb-2">
+                    <i class="fas fa-exclamation-triangle mr-2"></i>Terdapat kesalahan pada form:
+                </h4>
+                <ul class="list-disc list-inside text-red-700 space-y-1">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        <!-- Show success message -->
+        @if (session('success'))
+            <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                <div class="flex items-center text-green-800">
+                    <i class="fas fa-check-circle mr-2"></i>
+                    {{ session('success') }}
+                </div>
+            </div>
+        @endif
+
+        <!-- Show error message -->
+        @if (session('error'))
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                <div class="flex items-center text-red-800">
+                    <i class="fas fa-exclamation-circle mr-2"></i>
+                    {{ session('error') }}
+                </div>
+            </div>
+        @endif
 
         <!-- Main Registration Card -->
         <div class="bg-white rounded-xl shadow-lg overflow-hidden border-0">
@@ -231,22 +314,22 @@
                     <div class="bg-white rounded-lg p-6 shadow-sm">
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                             <div>
-                                <label class="block text-sm font-medium text-amber-700 mb-1">Dana Beasiswa</label>
+                                <span class="block text-sm font-medium text-amber-700 mb-1">Dana Beasiswa</span>
                                 <p class="text-yellow-600 font-bold text-lg">
                                     Rp {{ number_format($beasiswa->jumlah_dana, 0, ',', '.') }}
                                 </p>
                             </div>
                             <div>
-                                <label class="block text-sm font-medium text-amber-700 mb-1">Batas Waktu Pendaftaran</label>
+                                <span class="block text-sm font-medium text-amber-700 mb-1">Batas Waktu Pendaftaran</span>
                                 <p class="text-orange-600 font-bold text-lg">
                                     {{ \Carbon\Carbon::parse($beasiswa->tanggal_tutup)->format('d M Y') }}
                                 </p>
                             </div>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-amber-700 mb-2">Persyaratan</label>
+                            <span class="block text-sm font-medium text-amber-700 mb-2">Persyaratan</span>
                             <div class="bg-amber-50 border border-orange-200 rounded-lg p-4 text-amber-800 text-sm md:text-base whitespace-pre-line">
-                                {{ $beasiswa->persyaratan }}
+                                {{ $beasiswa->persyaratan ?? 'Tidak ada persyaratan khusus.' }}
                             </div>
                         </div>
                     </div>
@@ -258,11 +341,24 @@
                         <i class="fas fa-edit text-orange-500 mr-2"></i>Formulir Pendaftaran
                     </h5>
 
-                    <form method="POST" action="{{ route('pendaftar.store', $beasiswa) }}" enctype="multipart/form-data" id="registrationForm">
+                    <form method="POST" action="{{ route('pendaftar.store', $beasiswa) }}" enctype="multipart/form-data" id="registrationForm" novalidate>
                         @csrf
 
+                        {{-- Debug Information --}}
+                        @if(config('app.debug') && $beasiswa->form_fields)
+                            <div class="debug-info">
+                                <strong>Debug - Form Fields Available:</strong><br>
+                                Total fields: {{ is_array($beasiswa->form_fields) ? count($beasiswa->form_fields) : 'Not an array' }}<br>
+                                @if(is_array($beasiswa->form_fields))
+                                    @foreach($beasiswa->form_fields as $index => $field)
+                                        Field {{ $index }}: {{ is_array($field) ? ($field['key'] ?? 'No key') . ' (' . ($field['type'] ?? 'text') . ')' : 'Invalid field format' }}<br>
+                                    @endforeach
+                                @endif
+                            </div>
+                        @endif
+
                         {{-- Render Dynamic Form Fields by Position --}}
-                        @if($beasiswa->form_fields && count($beasiswa->form_fields) > 0)
+                        @if($beasiswa->form_fields && is_array($beasiswa->form_fields) && count($beasiswa->form_fields) > 0)
                             @foreach(['personal', 'academic', 'additional'] as $position)
                                 @php
                                     $positionFields = collect($beasiswa->form_fields)->where('position', $position);
@@ -288,95 +384,131 @@
                                         </h6>
                                         <div class="bg-white rounded-xl p-8 shadow-sm border border-orange-100">
                                             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                                @foreach($positionFields as $field)
-                                                    <div class="form-group {{ $field['type'] === 'textarea' ? 'full-width' : '' }}">
-                                                        <label for="{{ $field['key'] }}" class="form-label">
-                                                            <i class="{{ $field['icon'] }} text-orange-500 mr-2"></i>{{ $field['name'] }}
-                                                            @if($field['required'])<span class="text-red-500 ml-1">*</span>@endif
-                                                        </label>
+                                                @foreach($positionFields as $fieldIndex => $field)
+                                                    @if(is_array($field))
+                                                        @php
+                                                            $fieldId = ($field['key'] ?? 'field') . '_' . $position . '_' . $fieldIndex;
+                                                            $fieldName = $field['key'] ?? '';
+                                                            $fieldType = $field['type'] ?? 'text';
+                                                        @endphp
                                                         
-                                                        @switch($field['type'])
-                                                            @case('textarea')
-                                                                <textarea 
-                                                                    id="{{ $field['key'] }}" 
-                                                                    name="{{ $field['key'] }}"
-                                                                    class="form-textarea @error($field['key']) error @enderror"
-                                                                    placeholder="{{ $field['placeholder'] }}"
-                                                                    rows="4"
-                                                                    {{ $field['required'] ? 'required' : '' }}>{{ old($field['key']) }}</textarea>
-                                                                @break
-                                                            
-                                                            @case('select')
-                                                                <select 
-                                                                    id="{{ $field['key'] }}" 
-                                                                    name="{{ $field['key'] }}"
-                                                                    class="form-select @error($field['key']) error @enderror"
-                                                                    {{ $field['required'] ? 'required' : '' }}>
-                                                                    <option value="">{{ $field['placeholder'] ?: '-- Pilih --' }}</option>
-                                                                    @foreach($field['options'] ?? [] as $option)
-                                                                        <option value="{{ $option['value'] }}" {{ old($field['key']) == $option['value'] ? 'selected' : '' }}>
-                                                                            {{ $option['label'] }}
-                                                                        </option>
-                                                                    @endforeach
-                                                                </select>
-                                                                @break
+                                                        @if(!empty($fieldName))
+                                                            <div class="form-group {{ $fieldType === 'textarea' ? 'full-width' : '' }}">
+                                                                <label for="{{ $fieldId }}" class="form-label">
+                                                                    <i class="{{ $field['icon'] ?? 'fas fa-edit' }} text-orange-500 mr-2"></i>{{ $field['name'] ?? $fieldName }}
+                                                                    @if($field['required'] ?? false)<span class="text-red-500 ml-1">*</span>@endif
+                                                                </label>
+                                                                
+                                                                @switch($fieldType)
+                                                                    @case('textarea')
+                                                                        <textarea 
+                                                                            id="{{ $fieldId }}" 
+                                                                            name="{{ $fieldName }}"
+                                                                            class="form-textarea @error($fieldName) error @enderror"
+                                                                            placeholder="{{ $field['placeholder'] ?? '' }}"
+                                                                            rows="4"
+                                                                            {{ ($field['required'] ?? false) ? 'required' : '' }}>{{ old($fieldName) }}</textarea>
+                                                                        @break
+                                                                    
+                                                                    @case('select')
+                                                                        <select 
+                                                                            id="{{ $fieldId }}" 
+                                                                            name="{{ $fieldName }}"
+                                                                            class="form-select @error($fieldName) error @enderror"
+                                                                            {{ ($field['required'] ?? false) ? 'required' : '' }}>
+                                                                            <option value="">{{ $field['placeholder'] ?? '-- Pilih --' }}</option>
+                                                                            @if(isset($field['options']) && is_array($field['options']))
+                                                                                @foreach($field['options'] as $option)
+                                                                                    @if(is_array($option))
+                                                                                        <option value="{{ $option['value'] ?? '' }}" {{ old($fieldName) == ($option['value'] ?? '') ? 'selected' : '' }}>
+                                                                                            {{ $option['label'] ?? '' }}
+                                                                                        </option>
+                                                                                    @endif
+                                                                                @endforeach
+                                                                            @endif
+                                                                        </select>
+                                                                        @break
 
-                                                            @case('radio')
-                                                                <div class="space-y-2">
-                                                                    @foreach($field['options'] ?? [] as $option)
-                                                                        <label class="radio-option" data-value="{{ $option['value'] }}">
-                                                                            <input 
-                                                                                type="radio" 
-                                                                                name="{{ $field['key'] }}" 
-                                                                                value="{{ $option['value'] }}"
-                                                                                {{ old($field['key']) == $option['value'] ? 'checked' : '' }}
-                                                                                {{ $field['required'] ? 'required' : '' }}
-                                                                                onchange="updateRadioSelection('{{ $field['key'] }}', this)">
-                                                                            <span>{{ $option['label'] }}</span>
-                                                                        </label>
-                                                                    @endforeach
-                                                                </div>
-                                                                @break
+                                                                    @case('radio')
+                                                                        <div class="radio-group">
+                                                                            @if(isset($field['options']) && is_array($field['options']))
+                                                                                @foreach($field['options'] as $optionIndex => $option)
+                                                                                    @if(is_array($option))
+                                                                                        @php
+                                                                                            $radioId = $fieldId . '_option_' . $optionIndex;
+                                                                                        @endphp
+                                                                                        <div class="radio-option" data-value="{{ $option['value'] ?? '' }}">
+                                                                                            <input 
+                                                                                                type="radio" 
+                                                                                                id="{{ $radioId }}"
+                                                                                                name="{{ $fieldName }}" 
+                                                                                                value="{{ $option['value'] ?? '' }}"
+                                                                                                {{ old($fieldName) == ($option['value'] ?? '') ? 'checked' : '' }}
+                                                                                                {{ ($field['required'] ?? false) ? 'required' : '' }}
+                                                                                                onchange="updateRadioSelection('{{ $fieldName }}', this)">
+                                                                                            <label for="{{ $radioId }}" class="cursor-pointer flex-grow">
+                                                                                                <span>{{ $option['label'] ?? '' }}</span>
+                                                                                            </label>
+                                                                                        </div>
+                                                                                    @endif
+                                                                                @endforeach
+                                                                            @endif
+                                                                        </div>
+                                                                        @break
 
-                                                            @case('checkbox')
-                                                                <div class="space-y-2">
-                                                                    @foreach($field['options'] ?? [] as $option)
-                                                                        <label class="checkbox-option" data-value="{{ $option['value'] }}">
-                                                                            <input 
-                                                                                type="checkbox" 
-                                                                                name="{{ $field['key'] }}[]" 
-                                                                                value="{{ $option['value'] }}"
-                                                                                {{ in_array($option['value'], old($field['key'], [])) ? 'checked' : '' }}
-                                                                                onchange="updateCheckboxSelection(this)">
-                                                                            <span>{{ $option['label'] }}</span>
-                                                                        </label>
-                                                                    @endforeach
-                                                                </div>
-                                                                @break
+                                                                    @case('checkbox')
+                                                                        <div class="checkbox-group">
+                                                                            @if(isset($field['options']) && is_array($field['options']))
+                                                                                @foreach($field['options'] as $optionIndex => $option)
+                                                                                    @if(is_array($option))
+                                                                                        @php
+                                                                                            $checkboxId = $fieldId . '_option_' . $optionIndex;
+                                                                                        @endphp
+                                                                                        <div class="checkbox-option" data-value="{{ $option['value'] ?? '' }}">
+                                                                                            <input 
+                                                                                                type="checkbox" 
+                                                                                                id="{{ $checkboxId }}"
+                                                                                                name="{{ $fieldName }}[]" 
+                                                                                                value="{{ $option['value'] ?? '' }}"
+                                                                                                {{ in_array($option['value'] ?? '', old($fieldName, [])) ? 'checked' : '' }}
+                                                                                                onchange="updateCheckboxSelection(this)">
+                                                                                            <label for="{{ $checkboxId }}" class="cursor-pointer flex-grow">
+                                                                                                <span>{{ $option['label'] ?? '' }}</span>
+                                                                                            </label>
+                                                                                        </div>
+                                                                                    @endif
+                                                                                @endforeach
+                                                                            @endif
+                                                                        </div>
+                                                                        @break
 
-                                                            @default
-                                                                <input 
-                                                                    type="{{ $field['type'] }}" 
-                                                                    id="{{ $field['key'] }}" 
-                                                                    name="{{ $field['key'] }}"
-                                                                    class="form-input @error($field['key']) error @enderror"
-                                                                    placeholder="{{ $field['placeholder'] }}"
-                                                                    value="{{ old($field['key']) }}"
-                                                                    {{ $field['required'] ? 'required' : '' }}
-                                                                    @if($field['type'] === 'number' && $field['key'] === 'ipk')
-                                                                        step="0.01" min="0" max="4"
-                                                                    @elseif($field['type'] === 'number' && $field['key'] === 'semester')
-                                                                        min="1" max="14"
-                                                                    @endif>
-                                                        @endswitch
-                                                        
-                                                        @error($field['key'])
-                                                            <div class="error-message">
-                                                                <i class="fas fa-exclamation-circle mr-1"></i>
-                                                                {{ $message }}
+                                                                    @default
+                                                                        <input 
+                                                                            type="{{ $fieldType }}" 
+                                                                            id="{{ $fieldId }}" 
+                                                                            name="{{ $fieldName }}"
+                                                                            class="form-input @error($fieldName) error @enderror"
+                                                                            placeholder="{{ $field['placeholder'] ?? '' }}"
+                                                                            value="{{ old($fieldName) }}"
+                                                                            {{ ($field['required'] ?? false) ? 'required' : '' }}
+                                                                            @if($fieldType === 'number' && $fieldName === 'ipk')
+                                                                                step="0.01" min="0" max="4"
+                                                                            @elseif($fieldType === 'number' && $fieldName === 'semester')
+                                                                                min="1" max="14"
+                                                                            @elseif($fieldName === 'no_hp')
+                                                                                pattern="[0-9]{10,13}"
+                                                                            @endif>
+                                                                @endswitch
+                                                                
+                                                                @error($fieldName)
+                                                                    <div class="error-message">
+                                                                        <i class="fas fa-exclamation-circle mr-1"></i>
+                                                                        {{ $message }}
+                                                                    </div>
+                                                                @enderror
                                                             </div>
-                                                        @enderror
-                                                    </div>
+                                                        @endif
+                                                    @endif
                                                 @endforeach
                                             </div>
                                         </div>
@@ -390,16 +522,24 @@
                                     <i class="fas fa-exclamation-triangle text-red-500 mr-2"></i>
                                     <p class="text-red-700">Form pendaftaran belum dikonfigurasi oleh admin. Silakan hubungi administrator.</p>
                                 </div>
+                                @if(config('app.debug'))
+                                    <div class="mt-2 text-xs text-red-600">
+                                        Debug: form_fields = {{ json_encode($beasiswa->form_fields) }}
+                                    </div>
+                                @endif
                             </div>
                         @endif
 
                         <!-- Dynamic Document Upload Section -->
-                        @if ($beasiswa->required_documents && count($beasiswa->required_documents) > 0)
+                        @if (isset($beasiswa->required_documents) && $beasiswa->required_documents && count($beasiswa->required_documents) > 0)
                             @php
                                 $documents = is_array($beasiswa->required_documents) 
                                     ? collect($beasiswa->required_documents) 
-                                    : $beasiswa->required_documents;
-                                $uniqueDocuments = $documents->unique('key')->take(6);
+                                    : collect([]);
+                                $validDocuments = $documents->filter(function($doc) {
+                                    return is_array($doc) && !empty($doc['key']);
+                                });
+                                $uniqueDocuments = $validDocuments->unique('key')->take(6);
                             @endphp
                             
                             @if($uniqueDocuments->count() > 0)
@@ -409,9 +549,9 @@
                                     </h6>
                                     <div class="bg-white rounded-lg p-6 shadow-sm">
                                         <div class="grid grid-cols-1 md:grid-cols-{{ $uniqueDocuments->count() >= 3 ? '3' : ($uniqueDocuments->count() == 2 ? '2' : '1') }} gap-6">
-                                            @foreach ($uniqueDocuments as $document)
+                                            @foreach ($uniqueDocuments as $docIndex => $document)
                                                 @php
-                                                    $docKey = $document['key'] ?? 'doc_' . $loop->index;
+                                                    $docKey = $document['key'] ?? 'doc_' . $docIndex;
                                                     $docName = $document['name'] ?? 'Dokumen';
                                                     $docIcon = $document['icon'] ?? 'fas fa-file-upload';
                                                     $docColor = $document['color'] ?? 'orange';
@@ -419,14 +559,27 @@
                                                     $docMaxSize = $document['max_size'] ?? 5;
                                                     $docRequired = $document['required'] ?? true;
                                                     $docDescription = $document['description'] ?? '';
+                                                    $docId = 'upload_' . $docKey;
                                                 @endphp
                                                 
-                                                <div class="file-upload-card border-2 border-dashed border-orange-300 rounded-xl p-6 text-center cursor-pointer"
-                                                    id="card-{{ $docKey }}" data-doc-key="{{ $docKey }}">
-                                                    <label for="{{ $docKey }}" class="file-label cursor-pointer block">
-                                                        <div class="file-icon text-{{ $docColor }}-500 text-4xl mb-4">
-                                                            <i class="{{ $docIcon }}" id="icon-{{ $docKey }}"></i>
+                                                <div class="file-upload-card border-2 border-dashed border-orange-300 rounded-xl p-6 text-center"
+                                                    id="card_{{ $docKey }}" onclick="triggerFileInput('{{ $docId }}')">
+                                                    
+                                                    <!-- File input yang tersembunyi -->
+                                                    <input 
+                                                        type="file" 
+                                                        id="{{ $docId }}" 
+                                                        name="{{ $docKey }}"
+                                                        class="file-input-hidden"
+                                                        accept="{{ collect($docFormats)->map(fn($ext) => '.' . strtolower($ext))->implode(',') }}"
+                                                        {{ $docRequired ? 'required' : '' }}
+                                                        onchange="handleFileChange('{{ $docKey }}', this)">
+                                                    
+                                                    <div class="file-upload-area">
+                                                        <div class="file-icon text-{{ $docColor }}-500 text-4xl mb-4" id="icon_{{ $docKey }}">
+                                                            <i class="{{ $docIcon }}"></i>
                                                         </div>
+                                                        
                                                         <div class="file-info">
                                                             <h6 class="file-title font-semibold text-amber-800 mb-1">
                                                                 {{ $docName }}
@@ -434,41 +587,42 @@
                                                                     <span class="text-red-500">*</span>
                                                                 @endif
                                                             </h6>
-                                                            <small class="file-desc text-orange-600 text-sm block mb-2" id="desc-{{ $docKey }}">
-                                                                Format: {{ strtoupper(implode(', ', $docFormats)) }}<br>
-                                                                Max: {{ $docMaxSize }}MB
-                                                            </small>
-                                                            @if (!empty($docDescription))
-                                                                <div class="text-xs text-orange-500 mb-3">{{ $docDescription }}</div>
-                                                            @endif
+                                                            
+                                                            <div class="file-desc text-orange-600 text-sm block mb-2" id="desc_{{ $docKey }}">
+                                                                <div>Format: {{ strtoupper(implode(', ', $docFormats)) }}</div>
+                                                                <div>Max: {{ $docMaxSize }}MB</div>
+                                                                @if (!empty($docDescription))
+                                                                    <div class="text-xs text-orange-500 mt-1">{{ $docDescription }}</div>
+                                                                @endif
+                                                                <div class="text-xs text-gray-500 mt-2">Klik untuk memilih file</div>
+                                                            </div>
 
                                                             <!-- Status Upload -->
-                                                            <div class="upload-status mt-3 hidden" id="status-{{ $docKey }}">
+                                                            <div class="upload-status mt-3 hidden" id="status_{{ $docKey }}">
                                                                 <div class="flex items-center justify-center mb-2">
                                                                     <i class="fas fa-check-circle text-green-600 mr-2"></i>
-                                                                    <span class="text-green-700 font-medium text-sm" id="filename-{{ $docKey }}">
+                                                                    <span class="text-green-700 font-medium text-sm" id="filename_{{ $docKey }}">
                                                                         File berhasil dipilih
                                                                     </span>
                                                                 </div>
                                                                 <div class="flex justify-center space-x-2 mt-3">
-                                                                    <button type="button" onclick="previewFile('{{ $docKey }}')"
+                                                                    <button type="button" onclick="event.stopPropagation(); previewFile('{{ $docKey }}')"
                                                                         class="px-3 py-1 text-xs bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors">
                                                                         <i class="fas fa-eye mr-1"></i>Lihat
                                                                     </button>
-                                                                    <button type="button" onclick="removeFile('{{ $docKey }}')"
+                                                                    <button type="button" onclick="event.stopPropagation(); removeFile('{{ $docKey }}')"
                                                                         class="px-3 py-1 text-xs bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors">
                                                                         <i class="fas fa-trash mr-1"></i>Hapus
+                                                                    </button>
+                                                                    <button type="button" onclick="event.stopPropagation(); triggerFileInput('{{ $docId }}')"
+                                                                        class="px-3 py-1 text-xs bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors">
+                                                                        <i class="fas fa-edit mr-1"></i>Ganti
                                                                     </button>
                                                                 </div>
                                                             </div>
                                                         </div>
-                                                    </label>
-                                                    <input type="file" class="hidden file-input" 
-                                                        id="{{ $docKey }}" 
-                                                        name="{{ $docKey }}"
-                                                        accept="{{ collect($docFormats)->map(fn($ext) => '.' . $ext)->implode(',') }}"
-                                                        {{ $docRequired ? 'required' : '' }}
-                                                        onchange="handleFileUpload('{{ $docKey }}')">
+                                                    </div>
+                                                    
                                                     @error($docKey)
                                                         <div class="error-message mt-2">
                                                             <i class="fas fa-exclamation-circle mr-1"></i>
@@ -488,12 +642,18 @@
                             <div class="bg-yellow-100 border border-yellow-300 rounded-lg p-4 mb-6">
                                 <div class="flex items-start">
                                     <input class="mt-1 mr-3 w-4 h-4 text-orange-600 border-2 border-orange-300 rounded focus:ring-orange-500 focus:ring-2" 
-                                           type="checkbox" id="terms" required>
-                                    <label class="text-amber-800 text-sm cursor-pointer" for="terms">
+                                           type="checkbox" id="terms_agreement" name="terms_agreement" value="1" required>
+                                    <label class="text-amber-800 text-sm cursor-pointer" for="terms_agreement">
                                         Saya menyatakan bahwa data yang saya berikan adalah <strong>benar dan valid</strong>.
                                         Saya bersedia menerima konsekuensi jika terbukti memberikan data palsu.
                                     </label>
                                 </div>
+                                @error('terms_agreement')
+                                    <div class="error-message mt-2 ml-7">
+                                        <i class="fas fa-exclamation-circle mr-1"></i>
+                                        {{ $message }}
+                                    </div>
+                                @enderror
                             </div>
 
                             <div class="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -508,7 +668,7 @@
                                         class="bg-white border-2 border-orange-400 text-orange-700 px-6 py-3 rounded-full font-semibold hover:bg-orange-50 transition-all duration-300 text-center">
                                         <i class="fas fa-arrow-left mr-2"></i>Kembali
                                     </a>
-                                    <button type="submit"
+                                    <button type="submit" id="submitBtn"
                                         class="bg-gradient-to-r from-orange-500 to-amber-600 text-white px-6 py-3 rounded-full font-semibold hover:from-orange-600 hover:to-amber-700 transition-all duration-300 shadow-md hover:shadow-lg text-center">
                                         <i class="fas fa-paper-plane mr-2"></i>Daftar Sekarang
                                     </button>
@@ -547,16 +707,18 @@
                     <i class="fas fa-exclamation-triangle mr-2"></i>Persyaratan Dokumen
                 </h6>
                 <ul class="space-y-2">
-                    @if ($beasiswa->required_documents && count($beasiswa->required_documents) > 0)
+                    @if (isset($beasiswa->required_documents) && $beasiswa->required_documents && count($beasiswa->required_documents) > 0)
                         @foreach ($beasiswa->required_documents as $document)
-                            <li class="flex items-start">
-                                <i class="{{ $document['icon'] ?? 'fas fa-file' }} text-{{ $document['color'] ?? 'orange' }}-500 mt-1 mr-2"></i>
-                                <span class="text-amber-700 text-sm">
-                                    <strong>{{ $document['name'] }}:</strong>
-                                    {{ strtoupper(implode(', ', $document['formats'] ?? ['PDF'])) }}
-                                    (Max {{ $document['max_size'] ?? 5 }}MB)
-                                </span>
-                            </li>
+                            @if(is_array($document) && !empty($document['key']))
+                                <li class="flex items-start">
+                                    <i class="{{ $document['icon'] ?? 'fas fa-file' }} text-{{ $document['color'] ?? 'orange' }}-500 mt-1 mr-2"></i>
+                                    <span class="text-amber-700 text-sm">
+                                        <strong>{{ $document['name'] ?? 'Dokumen' }}:</strong>
+                                        {{ strtoupper(implode(', ', $document['formats'] ?? ['PDF'])) }}
+                                        (Max {{ $document['max_size'] ?? 5 }}MB)
+                                    </span>
+                                </li>
+                            @endif
                         @endforeach
                     @else
                         <li class="flex items-start">
@@ -571,23 +733,427 @@
 </div>
 
 <script>
-    // Global variables untuk menghindari duplikasi
-    let processedFiles = new Set();
+    // Global variables
+    let uploadedFiles = {};
     
-    // Input validation dan enhancement
+    // Enhanced console logging for debugging
+    function debugLog(message, data = null) {
+        if (typeof console !== 'undefined') {
+            if (data) {
+                console.log('[Form Debug] ' + message, data);
+            } else {
+                console.log('[Form Debug] ' + message);
+            }
+        }
+    }
+    
+    // Trigger file input when card is clicked
+    function triggerFileInput(inputId) {
+        debugLog('Triggering file input: ' + inputId);
+        const fileInput = document.getElementById(inputId);
+        if (fileInput) {
+            fileInput.click();
+        } else {
+            debugLog('File input not found: ' + inputId);
+        }
+    }
+    
+    // Handle file selection with improved validation
+    function handleFileChange(docKey, input) {
+        debugLog('File change detected for: ' + docKey);
+        
+        const file = input.files[0];
+        
+        if (!file) {
+            debugLog('No file selected');
+            resetFileStatus(docKey);
+            return;
+        }
+        
+        debugLog('File selected', {
+            name: file.name,
+            size: file.size,
+            type: file.type
+        });
+        
+        // Get validation parameters
+        const cardElement = document.getElementById(`card_${docKey}`);
+        const descElement = document.getElementById(`desc_${docKey}`);
+        
+        let maxSize = 5; // default 5MB
+        if (descElement) {
+            const maxSizeMatch = descElement.textContent.match(/Max:\s*(\d+)MB/i);
+            if (maxSizeMatch) {
+                maxSize = parseInt(maxSizeMatch[1]);
+            }
+        }
+        
+        // Validate file size
+        const maxSizeBytes = maxSize * 1024 * 1024;
+        if (file.size > maxSizeBytes) {
+            alert(`Ukuran file terlalu besar. Maksimal ${maxSize}MB.\nFile Anda: ${(file.size/1024/1024).toFixed(2)}MB`);
+            input.value = '';
+            resetFileStatus(docKey);
+            return;
+        }
+        
+        // Validate file format
+        const allowedFormats = input.accept.split(',').map(format => format.trim().toLowerCase());
+        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
+        
+        debugLog('Format validation', {
+            allowedFormats: allowedFormats,
+            fileExtension: fileExtension,
+            fileName: file.name
+        });
+        
+        if (allowedFormats.length > 0 && !allowedFormats.includes(fileExtension)) {
+            alert(`Format file tidak didukung.\nFormat yang diizinkan: ${allowedFormats.join(', ')}\nFile Anda: ${fileExtension}`);
+            input.value = '';
+            resetFileStatus(docKey);
+            return;
+        }
+        
+        // Update tampilan jika validasi berhasil
+        updateFileStatus(docKey, file);
+        
+        // Store file reference
+        uploadedFiles[docKey] = file;
+        
+        debugLog('File validation passed and stored', {
+            docKey: docKey,
+            fileName: file.name,
+            fileSize: file.size
+        });
+    }
+    
+    // Update file status display
+    function updateFileStatus(docKey, file) {
+        const card = document.getElementById(`card_${docKey}`);
+        const icon = document.getElementById(`icon_${docKey}`);
+        const desc = document.getElementById(`desc_${docKey}`);
+        const status = document.getElementById(`status_${docKey}`);
+        const filename = document.getElementById(`filename_${docKey}`);
+        
+        // Update card appearance
+        if (card) {
+            card.classList.remove('border-orange-300');
+            card.classList.add('border-green-500', 'bg-green-50', 'uploaded');
+        }
+        
+        // Update icon
+        if (icon) {
+            icon.innerHTML = '<i class="fas fa-check-circle"></i>';
+            icon.className = 'file-icon text-green-600 text-4xl mb-4';
+        }
+        
+        // Hide description and show status
+        if (desc) desc.classList.add('hidden');
+        if (status) status.classList.remove('hidden');
+        
+        // Update filename
+        if (filename) {
+            filename.textContent = file.name;
+        }
+        
+        // Add animation
+        if (card) {
+            card.style.animation = 'pulse 0.5s ease-in-out';
+            setTimeout(() => {
+                if (card) card.style.animation = '';
+            }, 500);
+        }
+        
+        debugLog('File status updated successfully', {
+            docKey: docKey,
+            fileName: file.name
+        });
+    }
+    
+    // Reset file status display
+    function resetFileStatus(docKey) {
+        const card = document.getElementById(`card_${docKey}`);
+        const icon = document.getElementById(`icon_${docKey}`);
+        const desc = document.getElementById(`desc_${docKey}`);
+        const status = document.getElementById(`status_${docKey}`);
+        const input = document.getElementById(`upload_${docKey}`);
+        
+        // Reset card appearance
+        if (card) {
+            card.classList.remove('border-green-500', 'bg-green-50', 'uploaded');
+            card.classList.add('border-orange-300');
+        }
+        
+        // Reset icon
+        if (icon) {
+            icon.innerHTML = '<i class="fas fa-file-upload"></i>';
+            icon.className = 'file-icon text-orange-500 text-4xl mb-4';
+        }
+        
+        // Show description and hide status
+        if (desc) desc.classList.remove('hidden');
+        if (status) status.classList.add('hidden');
+        
+        // Clear file input
+        if (input) {
+            input.value = '';
+        }
+        
+        // Remove from uploaded files
+        delete uploadedFiles[docKey];
+        
+        debugLog('File status reset', { docKey: docKey });
+    }
+    
+    // Preview file with better error handling
+    function previewFile(docKey) {
+        const input = document.getElementById(`upload_${docKey}`);
+        
+        if (!input || !input.files || !input.files[0]) {
+            alert('Tidak ada file yang dipilih.');
+            return;
+        }
+        
+        const file = input.files[0];
+        const fileType = file.type.toLowerCase();
+        
+        debugLog('Attempting to preview file', {
+            docKey: docKey,
+            fileName: file.name,
+            fileType: fileType,
+            fileSize: file.size
+        });
+        
+        try {
+            if (fileType.startsWith('image/')) {
+                // Preview gambar
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const newWindow = window.open('', '_blank', 'width=800,height=600');
+                    if (newWindow) {
+                        newWindow.document.write(`
+                            <html>
+                                <head>
+                                    <title>Preview: ${file.name}</title>
+                                    <style>
+                                        body { 
+                                            margin: 0; 
+                                            display: flex; 
+                                            justify-content: center; 
+                                            align-items: center; 
+                                            background: #f0f0f0; 
+                                            min-height: 100vh; 
+                                            font-family: Arial, sans-serif; 
+                                        }
+                                        img { 
+                                            max-width: 90%; 
+                                            max-height: 90vh; 
+                                            object-fit: contain; 
+                                            box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
+                                        }
+                                        .info { 
+                                            position: absolute; 
+                                            top: 10px; 
+                                            left: 10px; 
+                                            background: rgba(0,0,0,0.7); 
+                                            color: white; 
+                                            padding: 8px 12px; 
+                                            border-radius: 4px; 
+                                            font-size: 12px; 
+                                        }
+                                    </style>
+                                </head>
+                                <body>
+                                    <div class="info">${file.name} (${(file.size/1024/1024).toFixed(2)} MB)</div>
+                                    <img src="${e.target.result}" alt="${file.name}">
+                                </body>
+                            </html>
+                        `);
+                        debugLog('Image preview opened successfully');
+                    } else {
+                        alert('Pop-up diblokir. Silakan aktifkan pop-up untuk melihat preview file.');
+                    }
+                };
+                reader.onerror = function(error) {
+                    debugLog('FileReader error', error);
+                    alert('Gagal membaca file gambar.');
+                };
+                reader.readAsDataURL(file);
+            } else if (fileType === 'application/pdf') {
+                // Preview PDF
+                const fileURL = URL.createObjectURL(file);
+                const newWindow = window.open(fileURL, '_blank', 'width=900,height=700');
+                if (!newWindow) {
+                    alert('Pop-up diblokir. Silakan aktifkan pop-up untuk melihat preview file.');
+                } else {
+                    debugLog('PDF preview opened successfully');
+                }
+            } else {
+                alert(`Preview tidak tersedia untuk tipe file ${fileType}. File: ${file.name}`);
+                debugLog('Preview not supported for file type', {
+                    fileType: fileType,
+                    fileName: file.name
+                });
+            }
+        } catch (error) {
+            debugLog('Error previewing file', error);
+            alert('Terjadi kesalahan saat membuka preview file: ' + error.message);
+        }
+    }
+    
+    // Remove file with confirmation
+    function removeFile(docKey) {
+        if (!confirm('Apakah Anda yakin ingin menghapus file ini?')) {
+            return;
+        }
+        
+        resetFileStatus(docKey);
+        debugLog('File removed by user', { docKey: docKey });
+    }
+    
+    // Radio button selection handler
+    function updateRadioSelection(fieldName, selectedInput) {
+        debugLog('Updating radio selection', { fieldName: fieldName, value: selectedInput.value });
+        
+        const radioOptions = document.querySelectorAll(`input[name="${fieldName}"]`);
+        radioOptions.forEach(radio => {
+            const container = radio.closest('.radio-option');
+            if (container) {
+                container.classList.remove('selected');
+            }
+        });
+        
+        if (selectedInput && selectedInput.checked) {
+            const selectedContainer = selectedInput.closest('.radio-option');
+            if (selectedContainer) {
+                selectedContainer.classList.add('selected');
+            }
+        }
+    }
+    
+    // Checkbox selection handler
+    function updateCheckboxSelection(checkbox) {
+        debugLog('Updating checkbox selection', { 
+            name: checkbox.name, 
+            value: checkbox.value, 
+            checked: checkbox.checked 
+        });
+        
+        const container = checkbox.closest('.checkbox-option');
+        if (container) {
+            if (checkbox.checked) {
+                container.classList.add('selected');
+            } else {
+                container.classList.remove('selected');
+            }
+        }
+    }
+    
+    // Enhanced form validation
+    function validateForm() {
+        debugLog('Starting form validation...');
+        
+        let isValid = true;
+        const errors = [];
+        
+        // Check terms agreement
+        const termsCheckbox = document.getElementById('terms_agreement');
+        if (!termsCheckbox || !termsCheckbox.checked) {
+            isValid = false;
+            errors.push('Anda harus menyetujui syarat dan ketentuan.');
+            if (termsCheckbox) {
+                termsCheckbox.focus();
+                termsCheckbox.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+        
+        // Check required form fields
+        const requiredInputs = document.querySelectorAll('input[required], select[required], textarea[required]');
+        requiredInputs.forEach(input => {
+            if (input.type === 'checkbox' && input.name !== 'terms_agreement') {
+                // Handle checkbox groups
+                const checkboxGroup = document.querySelectorAll(`input[name="${input.name}"]`);
+                const hasChecked = Array.from(checkboxGroup).some(cb => cb.checked);
+                if (!hasChecked) {
+                    isValid = false;
+                    const label = input.closest('.form-group')?.querySelector('.form-label')?.textContent?.replace('*', '').trim();
+                    errors.push(`${label || input.name} minimal pilih satu.`);
+                }
+            } else if (input.type !== 'checkbox' && input.type !== 'file') {
+                if (!input.value.trim()) {
+                    isValid = false;
+                    const label = input.closest('.form-group')?.querySelector('.form-label')?.textContent?.replace('*', '').trim();
+                    errors.push(`${label || input.name} wajib diisi.`);
+                    input.classList.add('error');
+                }
+            }
+        });
+        
+        // Check required files
+        const requiredFileInputs = document.querySelectorAll('input[type="file"][required]');
+        requiredFileInputs.forEach(fileInput => {
+            if (!fileInput.files || fileInput.files.length === 0) {
+                isValid = false;
+                const docKey = fileInput.name;
+                const card = document.getElementById(`card_${docKey}`);
+                const titleElement = card?.querySelector('.file-title');
+                const fileName = titleElement ? titleElement.textContent.replace('*', '').trim() : docKey;
+                errors.push(`Dokumen ${fileName} wajib diupload.`);
+                
+                // Highlight the file upload card
+                if (card) {
+                    card.classList.add('border-red-500');
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        });
+        
+        debugLog('Form validation completed', {
+            isValid: isValid,
+            errorCount: errors.length,
+            errors: errors
+        });
+        
+        if (!isValid) {
+            alert('Terdapat kesalahan pada form:\n\n• ' + errors.join('\n• '));
+        }
+        
+        return isValid;
+    }
+    
+    // Initialize on page load
     document.addEventListener('DOMContentLoaded', function() {
-        // Enhanced input focus effects
+        debugLog('Document loaded, initializing form...');
+        
+        // Initialize existing radio/checkbox selections
+        const checkedRadios = document.querySelectorAll('input[type="radio"]:checked');
+        checkedRadios.forEach(radio => {
+            const container = radio.closest('.radio-option');
+            if (container) {
+                container.classList.add('selected');
+            }
+        });
+        
+        const checkedCheckboxes = document.querySelectorAll('input[type="checkbox"]:checked');
+        checkedCheckboxes.forEach(checkbox => {
+            if (checkbox.id !== 'terms_agreement') {
+                const container = checkbox.closest('.checkbox-option');
+                if (container) {
+                    container.classList.add('selected');
+                }
+            }
+        });
+        
+        // Enhanced input validation and formatting
         const inputs = document.querySelectorAll('.form-input, .form-textarea, .form-select');
         inputs.forEach(input => {
-            // Focus animation
             input.addEventListener('focus', function() {
                 this.classList.add('focused');
+                this.classList.remove('error');
             });
             
             input.addEventListener('blur', function() {
                 this.classList.remove('focused');
-                
-                // Validation feedback
                 if (this.hasAttribute('required') && !this.value.trim()) {
                     this.classList.add('error');
                 } else {
@@ -595,51 +1161,48 @@
                 }
             });
             
-            // Real-time validation
             input.addEventListener('input', function() {
                 this.classList.remove('error');
-                
-                // Remove any existing error messages
-                const existingError = this.parentElement.querySelector('.error-message');
-                if (existingError && !existingError.textContent.includes('{{')) {
-                    existingError.remove();
-                }
             });
         });
         
         // Phone number formatting
-        const phoneInput = document.getElementById('no_hp');
+        const phoneInput = document.querySelector('input[name="no_hp"]');
         if (phoneInput) {
             phoneInput.addEventListener('input', function() {
-                let value = this.value.replace(/\D/g, '');
-                if (value.length > 13) {
-                    value = value.substring(0, 13);
+                // Remove non-digits
+                this.value = this.value.replace(/\D/g, '');
+                // Limit to 13 characters
+                if (this.value.length > 13) {
+                    this.value = this.value.substring(0, 13);
                 }
-                this.value = value;
-                
-                // Visual feedback
-                if (value.length >= 10 && value.length <= 13) {
-                    this.classList.remove('error');
-                    this.classList.add('success');
+            });
+            
+            phoneInput.addEventListener('blur', function() {
+                // Add validation feedback
+                if (this.value.length > 0 && (this.value.length < 10 || this.value.length > 13)) {
+                    this.classList.add('error');
                 } else {
-                    this.classList.remove('success');
+                    this.classList.remove('error');
                 }
             });
         }
         
-        // NIM validation
-        const nimInput = document.getElementById('nim');
+        // NIM formatting
+        const nimInput = document.querySelector('input[name="nim"]');
         if (nimInput) {
             nimInput.addEventListener('input', function() {
+                // Remove non-digits
                 this.value = this.value.replace(/\D/g, '');
+                // Limit to 15 characters
                 if (this.value.length > 15) {
                     this.value = this.value.substring(0, 15);
                 }
             });
         }
         
-        // IPK validation
-        const ipkInput = document.getElementById('ipk');
+        // IPK formatting
+        const ipkInput = document.querySelector('input[name="ipk"]');
         if (ipkInput) {
             ipkInput.addEventListener('input', function() {
                 let value = parseFloat(this.value);
@@ -648,325 +1211,108 @@
                 } else if (value < 0) {
                     this.value = '0.00';
                 }
-                
-                // Visual feedback for IPK
-                if (value >= 3.5) {
-                    this.classList.add('success');
-                    this.classList.remove('error');
-                } else if (value >= 3.0) {
-                    this.classList.remove('success', 'error');
-                } else {
-                    this.classList.add('error');
-                    this.classList.remove('success');
-                }
             });
-        }
-        
-        // Character counter for textarea
-        const textareaElement = document.getElementById('alasan_mendaftar');
-        if (textareaElement) {
-            const maxLength = 1000;
-            let counterElement = textareaElement.parentNode.querySelector('.char-counter');
             
-            if (!counterElement) {
-                counterElement = document.createElement('div');
-                counterElement.className = 'char-counter text-right text-sm mt-2 text-orange-600';
-                textareaElement.parentNode.appendChild(counterElement);
-            }
-
-            function updateCounter() {
-                const currentLength = textareaElement.value.length;
-                const remaining = maxLength - currentLength;
-                counterElement.textContent = currentLength + '/' + maxLength + ' karakter';
-
-                if (remaining < 100) {
-                    counterElement.className = 'char-counter text-right text-sm mt-2 text-yellow-600';
-                } else if (remaining < 0) {
-                    counterElement.className = 'char-counter text-right text-sm mt-2 text-red-600';
-                    textareaElement.value = textareaElement.value.substring(0, maxLength);
-                } else {
-                    counterElement.className = 'char-counter text-right text-sm mt-2 text-orange-600';
-                }
-            }
-
-            textareaElement.addEventListener('input', updateCounter);
-            textareaElement.addEventListener('paste', function() {
-                setTimeout(updateCounter, 10);
-            });
-            updateCounter();
-        }
-        
-        // Initialize radio and checkbox selections
-        initializeRadioCheckboxes();
-    });
-
-    // Radio button selection handler
-    function updateRadioSelection(fieldName, selectedInput) {
-        const radioOptions = document.querySelectorAll(`input[name="${fieldName}"]`);
-        radioOptions.forEach(radio => {
-            const label = radio.closest('.radio-option');
-            if (label) {
-                label.classList.remove('selected');
-            }
-        });
-        
-        if (selectedInput.checked) {
-            const selectedLabel = selectedInput.closest('.radio-option');
-            if (selectedLabel) {
-                selectedLabel.classList.add('selected');
-            }
-        }
-    }
-
-    // Checkbox selection handler
-    function updateCheckboxSelection(checkbox) {
-        const label = checkbox.closest('.checkbox-option');
-        if (label) {
-            if (checkbox.checked) {
-                label.classList.add('selected');
-            } else {
-                label.classList.remove('selected');
-            }
-        }
-    }
-
-    // Initialize existing selections
-    function initializeRadioCheckboxes() {
-        // Initialize radio selections
-        const checkedRadios = document.querySelectorAll('input[type="radio"]:checked');
-        checkedRadios.forEach(radio => {
-            const label = radio.closest('.radio-option');
-            if (label) {
-                label.classList.add('selected');
-            }
-        });
-        
-        // Initialize checkbox selections
-        const checkedCheckboxes = document.querySelectorAll('input[type="checkbox"]:checked');
-        checkedCheckboxes.forEach(checkbox => {
-            const label = checkbox.closest('.checkbox-option');
-            if (label) {
-                label.classList.add('selected');
-            }
-        });
-    }
-
-    function handleFileUpload(documentKey) {
-        const fileInput = document.getElementById(documentKey);
-        const card = document.getElementById('card-' + documentKey);
-        const icon = document.getElementById('icon-' + documentKey);
-        const desc = document.getElementById('desc-' + documentKey);
-        const status = document.getElementById('status-' + documentKey);
-        const filename = document.getElementById('filename-' + documentKey);
-
-        if (!fileInput || !fileInput.files || !fileInput.files[0]) {
-            return;
-        }
-
-        const file = fileInput.files[0];
-        const fileKey = documentKey + '_' + file.name + '_' + file.size;
-        
-        // Cek jika file sudah diproses untuk menghindari duplikasi
-        if (processedFiles.has(fileKey)) {
-            return;
-        }
-        
-        processedFiles.add(fileKey);
-
-        // Validasi ukuran file
-        const maxSizeText = desc ? desc.textContent : '';
-        const maxSizeMatch = maxSizeText.match(/Max:\s*(\d+)MB/i);
-        const maxSize = (maxSizeMatch ? parseInt(maxSizeMatch[1]) : 5) * 1024 * 1024;
-
-        if (file.size > maxSize) {
-            alert('Ukuran file terlalu besar. Maksimal ' + Math.round(maxSize / 1024 / 1024) + 'MB.');
-            fileInput.value = '';
-            processedFiles.delete(fileKey);
-            return;
-        }
-
-        // Validasi format file
-        const allowedFormats = fileInput.accept.split(',').map(format => format.trim().toLowerCase());
-        const fileExtension = '.' + file.name.split('.').pop().toLowerCase();
-        
-        if (!allowedFormats.includes(fileExtension)) {
-            alert('Format file tidak didukung. Silakan pilih file dengan format yang sesuai.');
-            fileInput.value = '';
-            processedFiles.delete(fileKey);
-            return;
-        }
-
-        // Update tampilan card
-        if (card) {
-            card.classList.remove('border-orange-300');
-            card.classList.add('border-green-500', 'bg-green-50', 'uploaded');
-        }
-
-        // Update icon
-        if (icon) {
-            icon.className = 'fas fa-check-circle';
-            icon.parentElement.className = 'file-icon text-green-600 text-4xl mb-4';
-        }
-
-        // Hide description dan show status
-        if (desc) desc.classList.add('hidden');
-        if (status) status.classList.remove('hidden');
-
-        // Update filename
-        if (filename) filename.textContent = file.name;
-
-        // Animasi sukses
-        if (card) {
-            card.style.animation = 'pulse 0.5s ease-in-out';
-            setTimeout(() => {
-                card.style.animation = '';
-            }, 500);
-        }
-
-        console.log('File uploaded successfully:', file.name, 'for', documentKey);
-    }
-
-    function previewFile(documentKey) {
-        const fileInput = document.getElementById(documentKey);
-        if (!fileInput || !fileInput.files || !fileInput.files[0]) {
-            alert('Tidak ada file yang dipilih.');
-            return;
-        }
-
-        const file = fileInput.files[0];
-        const fileType = file.type.toLowerCase();
-
-        try {
-            if (fileType.startsWith('image/')) {
-                // Preview gambar
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const newWindow = window.open('', '_blank');
-                    if (newWindow) {
-                        newWindow.document.write(`
-                            <html>
-                                <head>
-                                    <title>${file.name}</title>
-                                    <style>
-                                        body { margin: 0; display: flex; justify-content: center; align-items: center; background: #f0f0f0; min-height: 100vh; }
-                                        img { max-width: 100%; max-height: 100vh; object-fit: contain; }
-                                    </style>
-                                </head>
-                                <body>
-                                    <img src="${e.target.result}" alt="${file.name}">
-                                </body>
-                            </html>
-                        `);
-                    }
-                };
-                reader.readAsDataURL(file);
-            } else if (fileType === 'application/pdf') {
-                // Preview PDF
-                const fileURL = URL.createObjectURL(file);
-                const newWindow = window.open(fileURL, '_blank');
-                if (!newWindow) {
-                    alert('Pop-up diblokir. Silakan aktifkan pop-up untuk melihat preview file.');
-                }
-            } else {
-                alert('Preview tidak tersedia untuk tipe file ini.');
-            }
-        } catch (error) {
-            console.error('Error previewing file:', error);
-            alert('Terjadi kesalahan saat membuka preview file.');
-        }
-    }
-
-    function removeFile(documentKey) {
-        if (!confirm('Apakah Anda yakin ingin menghapus file ini?')) {
-            return;
-        }
-
-        const fileInput = document.getElementById(documentKey);
-        if (fileInput) {
-            fileInput.value = '';
-            
-            // Remove from processed files set
-            const files = Array.from(processedFiles);
-            processedFiles.clear();
-            files.forEach(fileKey => {
-                if (!fileKey.startsWith(documentKey + '_')) {
-                    processedFiles.add(fileKey);
+            ipkInput.addEventListener('blur', function() {
+                if (this.value && !isNaN(this.value)) {
+                    this.value = parseFloat(this.value).toFixed(2);
                 }
             });
         }
         
-        resetFileStatus(documentKey);
-    }
-
-    function resetFileStatus(documentKey) {
-        const card = document.getElementById('card-' + documentKey);
-        const icon = document.getElementById('icon-' + documentKey);
-        const desc = document.getElementById('desc-' + documentKey);
-        const status = document.getElementById('status-' + documentKey);
-
-        if (card) {
-            card.classList.remove('border-green-500', 'bg-green-50', 'uploaded');
-            card.classList.add('border-orange-300');
-        }
-
-        if (icon) {
-            icon.className = 'fas fa-file-upload';
-            icon.parentElement.className = 'file-icon text-orange-500 text-4xl mb-4';
-        }
-
-        if (desc) desc.classList.remove('hidden');
-        if (status) status.classList.add('hidden');
-    }
-
-    // Form submission handling
-    document.addEventListener('DOMContentLoaded', function() {
+        // Form submission handling
         const form = document.getElementById('registrationForm');
-        const submitBtn = document.querySelector('button[type="submit"]');
-
-        if (form) {
+        const submitBtn = document.getElementById('submitBtn');
+        
+        if (form && submitBtn) {
             form.addEventListener('submit', function(e) {
-                const termsCheckbox = document.getElementById('terms');
-
-                if (!termsCheckbox || !termsCheckbox.checked) {
-                    e.preventDefault();
-                    alert('Anda harus menyetujui syarat dan ketentuan terlebih dahulu.');
-                    if (termsCheckbox) termsCheckbox.focus();
-                    return;
-                }
-
-                // Validasi file yang required
-                const requiredFiles = document.querySelectorAll('input[type="file"][required]');
-                let missingFiles = [];
+                debugLog('Form submission initiated...');
                 
-                requiredFiles.forEach(fileInput => {
-                    if (!fileInput.files || !fileInput.files[0]) {
-                        const label = document.querySelector(`label[for="${fileInput.id}"] .file-title`);
-                        const fileName = label ? label.textContent.trim() : fileInput.name;
-                        missingFiles.push(fileName);
-                    }
-                });
-
-                if (missingFiles.length > 0) {
+                // Prevent double submission
+                if (submitBtn.disabled) {
                     e.preventDefault();
-                    alert('Harap upload dokumen yang diperlukan: ' + missingFiles.join(', '));
-                    return;
+                    debugLog('Form already being submitted, preventing double submission');
+                    return false;
                 }
-
-                // Loading state
-                if (submitBtn) {
-                    submitBtn.classList.add('opacity-70', 'cursor-not-allowed');
-                    submitBtn.disabled = true;
-                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Mengirim...';
-
-                    // Re-enable setelah 30 detik sebagai fallback
-                    setTimeout(() => {
-                        submitBtn.classList.remove('opacity-70', 'cursor-not-allowed');
+                
+                // Validate form
+                if (!validateForm()) {
+                    e.preventDefault();
+                    debugLog('Form validation failed, preventing submission');
+                    return false;
+                }
+                
+                // Show loading state
+                submitBtn.disabled = true;
+                submitBtn.classList.add('opacity-70', 'cursor-not-allowed');
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Mengirim Data...';
+                
+                // Create progress indicator
+                const progressDiv = document.createElement('div');
+                progressDiv.className = 'fixed top-0 left-0 right-0 z-50 bg-orange-500 text-white text-center py-2';
+                progressDiv.innerHTML = '<i class="fas fa-upload mr-2"></i>Sedang mengirim data, mohon tunggu...';
+                document.body.appendChild(progressDiv);
+                
+                debugLog('Form submission proceeding with loading state active...');
+                
+                // Fallback timeout (30 seconds)
+                setTimeout(() => {
+                    if (submitBtn && submitBtn.disabled) {
+                        debugLog('Submission timeout reached, re-enabling form');
                         submitBtn.disabled = false;
+                        submitBtn.classList.remove('opacity-70', 'cursor-not-allowed');
                         submitBtn.innerHTML = '<i class="fas fa-paper-plane mr-2"></i>Daftar Sekarang';
-                    }, 30000);
-                }
+                        
+                        if (progressDiv && progressDiv.parentNode) {
+                            progressDiv.remove();
+                        }
+                        
+                        alert('Proses upload memakan waktu lama. Jika masalah berlanjut, coba refresh halaman dan submit ulang.');
+                    }
+                }, 30000);
+                
+                return true;
+            });
+            
+            debugLog('Form event listeners attached successfully');
+        } else {
+            debugLog('Form or submit button not found', {
+                form: !!form,
+                submitBtn: !!submitBtn
             });
         }
+        
+        // File input error recovery
+        const fileInputs = document.querySelectorAll('input[type="file"]');
+        fileInputs.forEach(fileInput => {
+            fileInput.addEventListener('error', function(e) {
+                debugLog('File input error', {
+                    inputName: this.name,
+                    error: e
+                });
+            });
+        });
+        
+        debugLog('Form initialization completed successfully');
+    });
+    
+    // Global error handler
+    window.addEventListener('error', function(e) {
+        debugLog('Global JavaScript error caught', {
+            message: e.message,
+            filename: e.filename,
+            lineno: e.lineno,
+            colno: e.colno,
+            error: e.error
+        });
+    });
+    
+    // Global unhandled promise rejection handler
+    window.addEventListener('unhandledrejection', function(e) {
+        debugLog('Unhandled promise rejection', {
+            reason: e.reason,
+            promise: e.promise
+        });
     });
 </script>
 

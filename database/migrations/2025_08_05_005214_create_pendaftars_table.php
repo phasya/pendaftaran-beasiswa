@@ -5,24 +5,49 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
-    public function up()
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
     {
         Schema::create('pendaftars', function (Blueprint $table) {
             $table->id();
-            $table->string('nama_beasiswa');
-            $table->text('deskripsi');
-            $table->decimal('jumlah_dana', 15, 2);
-            $table->date('tanggal_buka');
-            $table->date('tanggal_tutup');
-            $table->enum('status', ['aktif', 'nonaktif'])->default('aktif');
-            $table->text('persyaratan');
-            $table->json('form_fields')->nullable(); 
-            $table->json('required_documents')->nullable();
+            $table->unsignedBigInteger('beasiswa_id');
+            $table->string('email');
+
+            // JSON field untuk menyimpan semua data form dinamis dari admin
+            $table->json('form_data')->nullable();
+
+            // JSON field untuk menyimpan dokumen yang diupload
+            $table->json('uploaded_documents')->nullable();
+
+            // Status pendaftaran
+            $table->enum('status', ['pending', 'diterima', 'ditolak'])->default('pending');
+
+            // Field untuk admin memberikan catatan/alasan
+            $table->text('rejection_reason')->nullable();
+            $table->text('catatan_admin')->nullable();
+
+            // Field untuk mengatur resubmit
+            $table->boolean('can_resubmit')->default(false);
+            $table->timestamp('rejected_at')->nullable();
+
             $table->timestamps();
+
+            // Foreign key ke tabel beasiswas
+            $table->foreign('beasiswa_id')->references('id')->on('beasiswas')->onDelete('cascade');
+
+            // Indexes untuk performance
+            $table->index(['beasiswa_id', 'status']);
+            $table->index('email');
+            $table->index('status');
         });
     }
 
-    public function down()
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
     {
         Schema::dropIfExists('pendaftars');
     }
