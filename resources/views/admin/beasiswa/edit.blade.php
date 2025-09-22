@@ -228,10 +228,7 @@
                                             <span class="text-danger">*</span>
                                         </label>
                                         <div>
-                                            <button type="button" class="btn btn-sm btn-outline-success me-2"
-                                                id="loadDefaultFieldsBtn">
-                                                <i class="fas fa-magic me-2"></i>Muat Default
-                                            </button>
+                                            
                                             <button type="button" class="btn btn-sm btn-outline-primary" id="addFieldBtn">
                                                 <i class="fas fa-plus me-2"></i>Tambah Field
                                             </button>
@@ -264,10 +261,7 @@
                                             <span class="text-danger">*</span>
                                         </label>
                                         <div>
-                                            <button type="button" class="btn btn-sm btn-outline-success me-2"
-                                                id="loadDefaultDocsBtn">
-                                                <i class="fas fa-magic me-2"></i>Muat Default
-                                            </button>
+                                            
                                             <button type="button" class="btn btn-sm btn-outline-primary"
                                                 id="addDocumentBtn">
                                                 <i class="fas fa-plus me-2"></i>Tambah Dokumen

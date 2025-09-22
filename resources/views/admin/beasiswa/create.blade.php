@@ -84,6 +84,16 @@
         .dynamic-item.new-item {
             animation: slideIn 0.5s ease-out;
         }
+
+        .validation-error {
+            border-color: #dc3545 !important;
+        }
+
+        .error-message {
+            color: #dc3545;
+            font-size: 0.875em;
+            margin-top: 0.25rem;
+        }
     </style>
 
     <div class="container-fluid px-4 py-3">
@@ -95,6 +105,19 @@
                 </p>
             </div>
         </div>
+
+        <!-- Alert untuk error -->
+        @if($errors->any())
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <h6 class="alert-heading"><i class="fas fa-exclamation-triangle me-2"></i>Terdapat kesalahan:</h6>
+            <ul class="mb-0">
+                @foreach($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        @endif
 
         <div class="row">
             <div class="col-lg-10 mx-auto">
@@ -128,8 +151,12 @@
                                         <i class="fas fa-trophy text-warning me-2"></i>Nama Beasiswa
                                         <span class="text-danger">*</span>
                                     </label>
-                                    <input type="text" class="form-control" id="nama_beasiswa" name="nama_beasiswa"
+                                    <input type="text" class="form-control @error('nama_beasiswa') is-invalid @enderror" 
+                                        id="nama_beasiswa" name="nama_beasiswa" value="{{ old('nama_beasiswa') }}"
                                         placeholder="Contoh: Beasiswa Prestasi Akademik 2025" required>
+                                    @error('nama_beasiswa')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
                                 </div>
 
                                 <div class="mb-3">
@@ -137,8 +164,12 @@
                                         <i class="fas fa-align-left text-info me-2"></i>Deskripsi Beasiswa
                                         <span class="text-danger">*</span>
                                     </label>
-                                    <textarea class="form-control" id="deskripsi" name="deskripsi" rows="4"
-                                        placeholder="Jelaskan tujuan, target penerima, dan manfaat beasiswa ini..." required></textarea>
+                                    <textarea class="form-control @error('deskripsi') is-invalid @enderror" 
+                                        id="deskripsi" name="deskripsi" rows="4" required
+                                        placeholder="Jelaskan tujuan, target penerima, dan manfaat beasiswa ini...">{{ old('deskripsi') }}</textarea>
+                                    @error('deskripsi')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
                                 </div>
                             </div>
 
@@ -155,9 +186,13 @@
                                     </label>
                                     <div class="input-group">
                                         <span class="input-group-text">Rp</span>
-                                        <input type="number" class="form-control" id="jumlah_dana" name="jumlah_dana"
+                                        <input type="number" class="form-control @error('jumlah_dana') is-invalid @enderror" 
+                                            id="jumlah_dana" name="jumlah_dana" value="{{ old('jumlah_dana') }}"
                                             min="0" step="100000" placeholder="5000000" required>
                                     </div>
+                                    @error('jumlah_dana')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
                                 </div>
 
                                 <div class="row">
@@ -166,7 +201,11 @@
                                             <i class="fas fa-calendar-plus text-success me-2"></i>Tanggal Buka
                                             <span class="text-danger">*</span>
                                         </label>
-                                        <input type="date" class="form-control" id="tanggal_buka" name="tanggal_buka" required>
+                                        <input type="date" class="form-control @error('tanggal_buka') is-invalid @enderror" 
+                                            id="tanggal_buka" name="tanggal_buka" value="{{ old('tanggal_buka') }}" required>
+                                        @error('tanggal_buka')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
                                     </div>
 
                                     <div class="col-md-6 mb-3">
@@ -174,7 +213,11 @@
                                             <i class="fas fa-calendar-times text-danger me-2"></i>Tanggal Tutup
                                             <span class="text-danger">*</span>
                                         </label>
-                                        <input type="date" class="form-control" id="tanggal_tutup" name="tanggal_tutup" required>
+                                        <input type="date" class="form-control @error('tanggal_tutup') is-invalid @enderror" 
+                                            id="tanggal_tutup" name="tanggal_tutup" value="{{ old('tanggal_tutup') }}" required>
+                                        @error('tanggal_tutup')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
                                     </div>
                                 </div>
                             </div>
@@ -205,11 +248,17 @@
                                         <!-- Form fields will be added here dynamically -->
                                     </div>
 
-                                    <div id="formFieldsEmpty" class="text-center py-5 text-muted" style="display: none;">
+                                    <div id="formFieldsEmpty" class="text-center py-5 text-muted">
                                         <i class="fas fa-wpforms fa-3x mb-3 opacity-50"></i>
                                         <p class="mb-2">Belum ada field yang ditambahkan</p>
                                         <small>Klik "Tambah Field" atau "Muat Default" untuk memulai</small>
                                     </div>
+
+                                    <!-- Hidden fields for form_fields_json -->
+                                    <input type="hidden" name="form_fields_json" id="form_fields_json">
+                                    @error('form_fields_json')
+                                        <div class="error-message">{{ $message }}</div>
+                                    @enderror
                                 </div>
                             </div>
 
@@ -239,11 +288,17 @@
                                         <!-- Documents will be added here dynamically -->
                                     </div>
 
-                                    <div id="documentsEmpty" class="text-center py-5 text-muted" style="display: none;">
+                                    <div id="documentsEmpty" class="text-center py-5 text-muted">
                                         <i class="fas fa-folder-open fa-3x mb-3 opacity-50"></i>
                                         <p class="mb-2">Belum ada dokumen yang ditambahkan</p>
                                         <small>Klik "Tambah Dokumen" atau "Muat Default" untuk memulai</small>
                                     </div>
+
+                                    <!-- Hidden fields for required_documents_json -->
+                                    <input type="hidden" name="required_documents_json" id="required_documents_json">
+                                    @error('required_documents_json')
+                                        <div class="error-message">{{ $message }}</div>
+                                    @enderror
                                 </div>
                             </div>
 
@@ -258,11 +313,14 @@
                                         <i class="fas fa-toggle-on text-primary me-2"></i>Status Beasiswa
                                         <span class="text-danger">*</span>
                                     </label>
-                                    <select class="form-select" id="status" name="status" required>
+                                    <select class="form-select @error('status') is-invalid @enderror" id="status" name="status" required>
                                         <option value="">-- Pilih Status --</option>
-                                        <option value="aktif">Aktif (Bisa dilamar)</option>
-                                        <option value="nonaktif">Nonaktif (Tidak bisa dilamar)</option>
+                                        <option value="aktif" {{ old('status') == 'aktif' ? 'selected' : '' }}>Aktif (Bisa dilamar)</option>
+                                        <option value="nonaktif" {{ old('status') == 'nonaktif' ? 'selected' : '' }}>Nonaktif (Tidak bisa dilamar)</option>
                                     </select>
+                                    @error('status')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
                                 </div>
 
                                 <div class="mb-3">
@@ -270,9 +328,12 @@
                                         <i class="fas fa-list-check text-info me-2"></i>Persyaratan Pendaftaran
                                         <span class="text-danger">*</span>
                                     </label>
-                                    <textarea class="form-control" id="persyaratan" name="persyaratan" rows="8"
-                                        placeholder="Contoh:&#10;1. Mahasiswa aktif semester 3 ke atas&#10;2. IPK minimal 3.0&#10;3. Tidak sedang menerima beasiswa lain"
-                                        required></textarea>
+                                    <textarea class="form-control @error('persyaratan') is-invalid @enderror" 
+                                        id="persyaratan" name="persyaratan" rows="8" required
+                                        placeholder="Contoh:&#10;1. Mahasiswa aktif semester 3 ke atas&#10;2. IPK minimal 3.0&#10;3. Tidak sedang menerima beasiswa lain">{{ old('persyaratan') }}</textarea>
+                                    @error('persyaratan')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
                                 </div>
                             </div>
 
@@ -284,13 +345,13 @@
                                         <small>Pastikan semua data sudah benar sebelum menyimpan</small>
                                     </div>
                                     <div class="d-flex gap-2">
-                                        <button type="button" class="btn btn-outline-secondary">
+                                        <a href="{{ route('admin.beasiswa.index') }}" class="btn btn-outline-secondary">
                                             <i class="fas fa-arrow-left me-2"></i>Kembali
-                                        </button>
+                                        </a>
                                         <button type="button" class="btn btn-outline-warning" id="resetFormBtn">
                                             <i class="fas fa-undo me-2"></i>Reset
                                         </button>
-                                        <button type="submit" class="btn btn-primary">
+                                        <button type="submit" class="btn btn-primary" id="submitBtn">
                                             <i class="fas fa-save me-2"></i>Simpan Beasiswa
                                         </button>
                                     </div>
@@ -610,65 +671,79 @@
             const resetFormBtn = document.getElementById('resetFormBtn');
             const beasiswaForm = document.getElementById('beasiswaForm');
 
-            // Initialize
-            updateFormFieldsVisibility();
-            updateDocumentsVisibility();
+            // Load existing data from server-side
+            const existingFormFields = @json($beasiswa->form_fields ?? []);
+            const existingDocuments = @json($beasiswa->required_documents ?? []);
 
-            // Event Listeners
-            addFieldBtn.addEventListener('click', () => addFormField());
-            loadDefaultFieldsBtn.addEventListener('click', loadDefaultFormFields);
-            addDocumentBtn.addEventListener('click', () => addDocumentItem());
-            loadDefaultDocsBtn.addEventListener('click', loadDefaultDocuments);
-            resetFormBtn.addEventListener('click', resetForm);
+            // Initialize data arrays
+            if (existingFormFields && Array.isArray(existingFormFields) && existingFormFields.length > 0) {
+                formFieldsData = existingFormFields.map(field => ({
+                    name: field.name || '',
+                    key: field.key || '',
+                    type: field.type || '',
+                    icon: field.icon || '',
+                    placeholder: field.placeholder || '',
+                    position: field.position || '',
+                    options: field.options || [],
+                    validation: field.validation || '',
+                    required: field.required !== false
+                }));
+                formFieldsData.forEach(field => {
+                    if (field.key) usedFieldKeys.add(field.key);
+                });
+            }
 
-            // Auto Key Generation Functions
+            if (existingDocuments && Array.isArray(existingDocuments) && existingDocuments.length > 0) {
+                documentsData = existingDocuments.map(doc => ({
+                    name: doc.name || '',
+                    key: doc.key || '',
+                    icon: doc.icon || '',
+                    color: doc.color || '',
+                    formats: Array.isArray(doc.formats) ? doc.formats : (typeof doc.formats === 'string' ? doc.formats.split(',') : ['pdf']),
+                    max_size: parseInt(doc.max_size || 5),
+                    description: doc.description || '',
+                    required: doc.required !== false
+                }));
+                documentsData.forEach(d => {
+                    if (d.key) usedDocumentKeys.add(d.key);
+                });
+            }
+
+            // Utility functions
             function generateUniqueFieldKey(name) {
-                let baseKey = name
-                    .toLowerCase()
+                let baseKey = name.toLowerCase()
                     .replace(/[^a-z0-9\s]/g, '')
                     .replace(/\s+/g, '_')
                     .substring(0, 30);
-
-                if (!baseKey) {
-                    baseKey = 'field';
-                }
+                if (!baseKey) baseKey = 'field';
 
                 let key = baseKey;
                 let counter = 1;
-
                 while (usedFieldKeys.has(key)) {
                     key = baseKey + '_' + counter;
                     counter++;
                 }
-
-                usedFieldKeys.add(key);
                 return key;
             }
 
             function generateUniqueDocumentKey(name) {
-                let baseKey = name
-                    .toLowerCase()
+                let baseKey = name.toLowerCase()
                     .replace(/[^a-z0-9\s]/g, '')
                     .replace(/\s+/g, '_')
                     .substring(0, 25);
-
-                if (!baseKey) {
-                    baseKey = 'dokumen';
-                }
+                if (!baseKey) baseKey = 'dokumen';
 
                 let key = 'file_' + baseKey;
                 let counter = 1;
-
                 while (usedDocumentKeys.has(key)) {
                     key = 'file_' + baseKey + '_' + counter;
                     counter++;
                 }
-
-                usedDocumentKeys.add(key);
                 return key;
             }
 
             function removeFromUsedKeys(key, isDocument = false) {
+                if (!key) return;
                 if (isDocument) {
                     usedDocumentKeys.delete(key);
                 } else {
@@ -676,46 +751,54 @@
                 }
             }
 
-            // Form Fields Management
-            function addFormField(data = null) {
+            // Form fields management
+            function addFormField(data = null, index = null) {
                 fieldCounter++;
                 const template = document.getElementById('formFieldTemplate');
                 const clone = template.content.cloneNode(true);
 
+                const dataIndex = (index !== null) ? index : formFieldsData.length;
+
+                // Set numbering
                 clone.querySelector('.item-number').textContent = fieldCounter;
                 const fieldElement = clone.querySelector('.dynamic-item');
-                fieldElement.setAttribute('data-index', formFieldsData.length);
+                fieldElement.setAttribute('data-index', dataIndex);
 
-                setupFormFieldEvents(clone, formFieldsData.length);
+                // Append to DOM first
+                formFieldsContainer.appendChild(clone);
 
+                // Get the actual DOM element that was just added
+                const addedElement = formFieldsContainer.lastElementChild;
+
+                // Setup events
+                setupFormFieldEvents(addedElement, dataIndex);
+
+                // Fill data if provided
                 if (data) {
-                    fillFormFieldData(clone, data);
-                    if (data.key) {
+                    fillFormFieldData(addedElement, data);
+                    if (data.key && !usedFieldKeys.has(data.key)) {
                         usedFieldKeys.add(data.key);
                     }
                 }
 
-                formFieldsContainer.appendChild(clone);
-
+                // Add to data array if new
                 const newFieldData = data || {
-                    name: '',
-                    key: '',
-                    type: '',
-                    icon: '',
-                    placeholder: '',
-                    position: '',
-                    options: [],
-                    validation: '',
-                    required: true
+                    name: '', key: '', type: '', icon: '', placeholder: '',
+                    position: '', options: [], validation: '', required: true
                 };
 
-                formFieldsData.push(newFieldData);
+                if (!data) {
+                    formFieldsData.push(newFieldData);
+                }
+
                 updateFormFieldsVisibility();
 
-                const newItem = formFieldsContainer.lastElementChild;
-                newItem.classList.add('new-item');
-                setTimeout(() => newItem.classList.remove('new-item'), 500);
-                newItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // Animation and scroll
+                if (addedElement) {
+                    addedElement.classList.add('new-item');
+                    setTimeout(() => addedElement.classList.remove('new-item'), 500);
+                    addedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
             }
 
             function setupFormFieldEvents(fieldElement, index) {
@@ -730,113 +813,47 @@
                 const removeBtn = fieldElement.querySelector('.remove-field-btn');
                 const optionsSection = fieldElement.querySelector('.field-options-section');
                 const addOptionBtn = fieldElement.querySelector('.add-option-btn');
-
-                const previewLabel = fieldElement.querySelector('.field-preview label');
-                const previewInput = fieldElement.querySelector('.field-preview input');
-                const previewSmall = fieldElement.querySelector('.field-preview small');
+                const optionsContainer = fieldElement.querySelector('.field-options-container');
 
                 function updateFormFieldData() {
-                    if (formFieldsData[index]) {
-                        // Generate key if name changed
-                        if (nameInput.value && nameInput.value !== formFieldsData[index].name) {
-                            if (formFieldsData[index].key) {
-                                removeFromUsedKeys(formFieldsData[index].key, false);
-                            }
+                    if (typeof formFieldsData[index] === 'undefined') return;
+
+                    // Auto-generate key if name changed and no key exists
+                    if (nameInput && nameInput.value && nameInput.value !== formFieldsData[index].name) {
+                        if (!formFieldsData[index].key) {
                             formFieldsData[index].key = generateUniqueFieldKey(nameInput.value);
-                            keyDisplay.textContent = formFieldsData[index].key;
+                            usedFieldKeys.add(formFieldsData[index].key);
+                            if (keyDisplay) keyDisplay.textContent = formFieldsData[index].key;
                         }
-
-                        formFieldsData[index].name = nameInput.value;
-                        formFieldsData[index].type = typeSelect.value;
-                        formFieldsData[index].icon = iconSelect.value;
-                        formFieldsData[index].placeholder = placeholderInput.value;
-                        formFieldsData[index].position = positionSelect.value;
-                        formFieldsData[index].validation = validationInput.value;
-                        formFieldsData[index].required = requiredCheckbox.checked;
-
-                        // Update options for select/radio/checkbox
-                        if (['select', 'radio', 'checkbox'].includes(typeSelect.value)) {
-                            const optionInputs = fieldElement.querySelectorAll('.option-value');
-                            const optionLabels = fieldElement.querySelectorAll('.option-label');
-                            formFieldsData[index].options = [];
-
-                            optionInputs.forEach((input, idx) => {
-                                if (input.value && optionLabels[idx] && optionLabels[idx].value) {
-                                    formFieldsData[index].options.push({
-                                        value: input.value,
-                                        label: optionLabels[idx].value
-                                    });
-                                }
-                            });
-                        }
-
-                        updatePreview();
                     }
-                }
 
-                function updatePreview() {
-                    const data = formFieldsData[index];
-                    if (!data) return;
+                    // Update all field data
+                    formFieldsData[index].name = nameInput ? nameInput.value : '';
+                    formFieldsData[index].type = typeSelect ? typeSelect.value : '';
+                    formFieldsData[index].icon = iconSelect ? iconSelect.value : '';
+                    formFieldsData[index].placeholder = placeholderInput ? placeholderInput.value : '';
+                    formFieldsData[index].position = positionSelect ? positionSelect.value : '';
+                    formFieldsData[index].validation = validationInput ? validationInput.value : '';
+                    formFieldsData[index].required = requiredCheckbox ? requiredCheckbox.checked : false;
 
-                    const iconClass = data.icon || 'fas fa-user';
-                    const fieldName = data.name || 'Nama Field';
-                    const requiredMark = data.required ? ' <span class="text-danger">*</span>' : '';
-                    const positionText = data.position ? getPositionText(data.position) : 'Tidak ditentukan';
+                    // Update options for select/radio/checkbox
+                    if (['select', 'radio', 'checkbox'].includes(formFieldsData[index].type)) {
+                        const optionInputs = fieldElement.querySelectorAll('.option-value');
+                        const optionLabels = fieldElement.querySelectorAll('.option-label');
+                        formFieldsData[index].options = [];
 
-                    previewLabel.innerHTML = `<i class="${iconClass} text-primary me-2"></i>${fieldName}${requiredMark}`;
-                    previewInput.placeholder = data.placeholder || 'Placeholder...';
-                    previewSmall.textContent = `Posisi: ${positionText}`;
-
-                    // Update input type for preview
-                    if (data.type === 'textarea') {
-                        if (previewInput.tagName.toLowerCase() !== 'textarea') {
-                            const textarea = document.createElement('textarea');
-                            textarea.className = previewInput.className;
-                            textarea.placeholder = previewInput.placeholder;
-                            textarea.disabled = true;
-                            textarea.rows = 3;
-                            previewInput.parentNode.replaceChild(textarea, previewInput);
-                        }
-                    } else if (data.type === 'select') {
-                        if (previewInput.tagName.toLowerCase() !== 'select') {
-                            const select = document.createElement('select');
-                            select.className = previewInput.className.replace('form-control', 'form-select');
-                            select.disabled = true;
-
-                            const defaultOption = document.createElement('option');
-                            defaultOption.textContent = data.placeholder || '-- Pilih --';
-                            select.appendChild(defaultOption);
-
-                            data.options.forEach(option => {
-                                const opt = document.createElement('option');
-                                opt.value = option.value;
-                                opt.textContent = option.label;
-                                select.appendChild(opt);
-                            });
-
-                            previewInput.parentNode.replaceChild(select, previewInput);
-                        }
+                        optionInputs.forEach((input, idx) => {
+                            const label = optionLabels[idx];
+                            if (input && input.value && label && label.value) {
+                                formFieldsData[index].options.push({
+                                    value: input.value,
+                                    label: label.value
+                                });
+                            }
+                        });
                     } else {
-                        if (previewInput.tagName.toLowerCase() !== 'input') {
-                            const input = document.createElement('input');
-                            input.className = 'form-control';
-                            input.type = data.type || 'text';
-                            input.placeholder = data.placeholder || 'Placeholder...';
-                            input.disabled = true;
-                            previewInput.parentNode.replaceChild(input, previewInput);
-                        } else {
-                            previewInput.type = data.type || 'text';
-                        }
+                        formFieldsData[index].options = [];
                     }
-                }
-
-                function getPositionText(position) {
-                    const positions = {
-                        'personal': 'Data Personal',
-                        'academic': 'Data Akademik',
-                        'additional': 'Data Tambahan'
-                    };
-                    return positions[position] || position;
                 }
 
                 function toggleOptionsSection() {
@@ -848,20 +865,20 @@
                     }
                 }
 
-                function addOption() {
-                    const container = fieldElement.querySelector('.field-options-container');
+                function addOption(value = '', label = '') {
                     const optionDiv = document.createElement('div');
                     optionDiv.className = 'input-group mb-2';
                     optionDiv.innerHTML = `
-                    <input type="text" class="form-control option-value" placeholder="Nilai opsi">
-                    <input type="text" class="form-control option-label" placeholder="Label opsi">
+                    <input type="text" class="form-control option-value" placeholder="Nilai opsi" value="${value}">
+                    <input type="text" class="form-control option-label" placeholder="Label opsi" value="${label}">
                     <button type="button" class="btn btn-outline-danger remove-option-btn">
                         <i class="fas fa-trash"></i>
                     </button>
                 `;
 
-                    container.appendChild(optionDiv);
+                    optionsContainer.appendChild(optionDiv);
 
+                    // Add event listeners to new option inputs
                     const valueInput = optionDiv.querySelector('.option-value');
                     const labelInput = optionDiv.querySelector('.option-label');
                     const removeBtn = optionDiv.querySelector('.remove-option-btn');
@@ -874,134 +891,264 @@
                     });
                 }
 
-                // Event listeners
-                nameInput.addEventListener('input', updateFormFieldData);
-                typeSelect.addEventListener('change', () => {
-                    toggleOptionsSection();
-                    updateFormFieldData();
-                });
-                iconSelect.addEventListener('change', updateFormFieldData);
-                placeholderInput.addEventListener('input', updateFormFieldData);
-                positionSelect.addEventListener('change', updateFormFieldData);
-                validationInput.addEventListener('input', updateFormFieldData);
-                requiredCheckbox.addEventListener('change', updateFormFieldData);
-                addOptionBtn.addEventListener('click', addOption);
+                // Attach event listeners
+                if (nameInput) nameInput.addEventListener('input', updateFormFieldData);
+                if (typeSelect) {
+                    typeSelect.addEventListener('change', () => {
+                        toggleOptionsSection();
+                        updateFormFieldData();
+                    });
+                }
+                if (iconSelect) iconSelect.addEventListener('change', updateFormFieldData);
+                if (placeholderInput) placeholderInput.addEventListener('input', updateFormFieldData);
+                if (positionSelect) positionSelect.addEventListener('change', updateFormFieldData);
+                if (validationInput) validationInput.addEventListener('input', updateFormFieldData);
+                if (requiredCheckbox) requiredCheckbox.addEventListener('change', updateFormFieldData);
+                if (addOptionBtn) addOptionBtn.addEventListener('click', () => addOption());
 
-                removeBtn.addEventListener('click', () => {
-                    if (confirm('Yakin ingin hapus field ini?')) {
-                        removeFormField(index);
-                    }
+                if (removeBtn) {
+                    removeBtn.addEventListener('click', () => {
+                        if (confirm('Yakin ingin hapus field ini?')) {
+                            removeFormField(index);
+                        }
+                    });
+                }
+
+                // Setup existing option remove buttons
+                const existingOptionRemoves = fieldElement.querySelectorAll('.remove-option-btn');
+                existingOptionRemoves.forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const group = e.target.closest('.input-group');
+                        if (group) {
+                            group.remove();
+                            updateFormFieldData();
+                        }
+                    });
                 });
 
-                // Initial setup
                 toggleOptionsSection();
-                updatePreview();
             }
 
             function fillFormFieldData(fieldElement, data) {
-                fieldElement.querySelector('.field-name').value = data.name || '';
-                fieldElement.querySelector('.field-key-display').textContent = data.key || 'akan_dibuat_otomatis';
-                fieldElement.querySelector('.field-type').value = data.type || '';
-                fieldElement.querySelector('.field-icon').value = data.icon || '';
-                fieldElement.querySelector('.field-placeholder').value = data.placeholder || '';
-                fieldElement.querySelector('.field-position').value = data.position || '';
-                fieldElement.querySelector('.field-validation').value = data.validation || '';
-                fieldElement.querySelector('.field-required').checked = data.required !== false;
+                const nameInput = fieldElement.querySelector('.field-name');
+                const keyDisplay = fieldElement.querySelector('.field-key-display');
+                const typeSelect = fieldElement.querySelector('.field-type');
+                const iconSelect = fieldElement.querySelector('.field-icon');
+                const placeholderInput = fieldElement.querySelector('.field-placeholder');
+                const positionSelect = fieldElement.querySelector('.field-position');
+                const validationInput = fieldElement.querySelector('.field-validation');
+                const requiredCheckbox = fieldElement.querySelector('.field-required');
+                const optionsContainer = fieldElement.querySelector('.field-options-container');
 
-                // Fill options if available
+                if (nameInput) nameInput.value = data.name || '';
+                if (keyDisplay) keyDisplay.textContent = data.key || 'akan_dibuat_otomatis';
+                if (typeSelect) typeSelect.value = data.type || '';
+                if (iconSelect) iconSelect.value = data.icon || '';
+                if (placeholderInput) placeholderInput.value = data.placeholder || '';
+                if (positionSelect) positionSelect.value = data.position || '';
+                if (validationInput) validationInput.value = data.validation || '';
+                if (requiredCheckbox) requiredCheckbox.checked = data.required !== false;
+
+                // Fill options if they exist
                 if (data.options && Array.isArray(data.options) && data.options.length > 0) {
-                    const container = fieldElement.querySelector('.field-options-container');
-                    container.innerHTML = '';
-
-                    data.options.forEach(option => {
+                    optionsContainer.innerHTML = '';
+                    data.options.forEach(opt => {
                         const optionDiv = document.createElement('div');
                         optionDiv.className = 'input-group mb-2';
                         optionDiv.innerHTML = `
-                        <input type="text" class="form-control option-value" placeholder="Nilai opsi" value="${option.value || ''}">
-                        <input type="text" class="form-control option-label" placeholder="Label opsi" value="${option.label || ''}">
+                        <input type="text" class="form-control option-value" placeholder="Nilai opsi" value="${opt.value || ''}">
+                        <input type="text" class="form-control option-label" placeholder="Label opsi" value="${opt.label || ''}">
                         <button type="button" class="btn btn-outline-danger remove-option-btn">
                             <i class="fas fa-trash"></i>
                         </button>
                     `;
-                        container.appendChild(optionDiv);
+                        optionsContainer.appendChild(optionDiv);
 
-                        // Add event listeners for each option
+                        // Add event listeners for options
                         const valueInput = optionDiv.querySelector('.option-value');
                         const labelInput = optionDiv.querySelector('.option-label');
                         const removeBtn = optionDiv.querySelector('.remove-option-btn');
 
-                        valueInput.addEventListener('input', () => {
-                            updateFormFieldDataForIndex(index);
-                        });
-                        labelInput.addEventListener('input', () => {
-                            updateFormFieldDataForIndex(index);
-                        });
-                        removeBtn.addEventListener('click', () => {
-                            optionDiv.remove();
-                            updateFormFieldDataForIndex(index);
-                        });
+                        if (valueInput) valueInput.addEventListener('input', () => { });
+                        if (labelInput) labelInput.addEventListener('input', () => { });
+                        if (removeBtn) {
+                            removeBtn.addEventListener('click', () => {
+                                optionDiv.remove();
+                            });
+                        }
                     });
                 }
             }
 
-            function updateFormFieldDataForIndex(index) {
-                const fieldElement = formFieldsContainer.querySelector(`[data-index="${index}"]`);
-                if (!fieldElement) return;
+            // Document management functions
+            function addDocumentItem(data = null, index = null) {
+                documentCounter++;
+                const template = document.getElementById('documentTemplate');
+                const clone = template.content.cloneNode(true);
 
-                const nameInput = fieldElement.querySelector('.field-name');
-                const typeSelect = fieldElement.querySelector('.field-type');
-                const optionInputs = fieldElement.querySelectorAll('.option-value');
-                const optionLabels = fieldElement.querySelectorAll('.option-label');
+                const dataIndex = (index !== null) ? index : documentsData.length;
 
-                if (formFieldsData[index]) {
-                    // Update options for select/radio/checkbox
-                    if (['select', 'radio', 'checkbox'].includes(typeSelect.value)) {
-                        formFieldsData[index].options = [];
-                        optionInputs.forEach((input, idx) => {
-                            if (input.value && optionLabels[idx] && optionLabels[idx].value) {
-                                formFieldsData[index].options.push({
-                                    value: input.value,
-                                    label: optionLabels[idx].value
-                                });
-                            }
-                        });
+                clone.querySelector('.item-number').textContent = documentCounter;
+                const docElement = clone.querySelector('.dynamic-item');
+                docElement.setAttribute('data-index', dataIndex);
+
+                documentsContainer.appendChild(clone);
+
+                const addedElement = documentsContainer.lastElementChild;
+                setupDocumentEvents(addedElement, dataIndex);
+
+                if (data) {
+                    fillDocumentData(addedElement, data);
+                    if (data.key && !usedDocumentKeys.has(data.key)) {
+                        usedDocumentKeys.add(data.key);
                     }
+                }
+
+                const newDocData = data || {
+                    name: '', key: '', icon: '', color: '', formats: [],
+                    max_size: 5, description: '', required: true
+                };
+
+                if (!data) {
+                    documentsData.push(newDocData);
+                }
+
+                updateDocumentsVisibility();
+
+                if (addedElement) {
+                    addedElement.classList.add('new-item');
+                    setTimeout(() => addedElement.classList.remove('new-item'), 500);
+                    addedElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
             }
 
+            function setupDocumentEvents(documentElement, index) {
+                const nameInput = documentElement.querySelector('.document-name');
+                const keyDisplay = documentElement.querySelector('.document-key-display');
+                const iconSelect = documentElement.querySelector('.document-icon');
+                const colorSelect = documentElement.querySelector('.document-color');
+                const formatCheckboxes = documentElement.querySelectorAll('.document-format');
+                const maxSizeInput = documentElement.querySelector('.document-max-size');
+                const descriptionInput = documentElement.querySelector('.document-description');
+                const requiredCheckbox = documentElement.querySelector('.document-required');
+                const removeBtn = documentElement.querySelector('.remove-document-btn');
+
+                function updateDocumentData() {
+                    if (typeof documentsData[index] === 'undefined') return;
+
+                    // Auto-generate key if name changed
+                    if (nameInput && nameInput.value && nameInput.value !== documentsData[index].name) {
+                        if (!documentsData[index].key) {
+                            documentsData[index].key = generateUniqueDocumentKey(nameInput.value);
+                            usedDocumentKeys.add(documentsData[index].key);
+                            if (keyDisplay) keyDisplay.textContent = documentsData[index].key;
+                        }
+                    }
+
+                    documentsData[index].name = nameInput ? nameInput.value : '';
+                    documentsData[index].icon = iconSelect ? iconSelect.value : '';
+                    documentsData[index].color = colorSelect ? colorSelect.value : '';
+                    documentsData[index].formats = Array.from(formatCheckboxes)
+                        .filter(cb => cb.checked)
+                        .map(cb => cb.value);
+                    documentsData[index].max_size = parseInt(maxSizeInput?.value || 5);
+                    documentsData[index].description = descriptionInput ? descriptionInput.value : '';
+                    documentsData[index].required = requiredCheckbox ? requiredCheckbox.checked : false;
+                }
+
+                // Attach event listeners
+                if (nameInput) nameInput.addEventListener('input', updateDocumentData);
+                if (iconSelect) iconSelect.addEventListener('change', updateDocumentData);
+                if (colorSelect) colorSelect.addEventListener('change', updateDocumentData);
+                if (maxSizeInput) maxSizeInput.addEventListener('input', updateDocumentData);
+                if (descriptionInput) descriptionInput.addEventListener('input', updateDocumentData);
+                if (requiredCheckbox) requiredCheckbox.addEventListener('change', updateDocumentData);
+
+                formatCheckboxes.forEach(cb => {
+                    cb.addEventListener('change', updateDocumentData);
+                });
+
+                if (removeBtn) {
+                    removeBtn.addEventListener('click', () => {
+                        if (confirm('Yakin ingin hapus dokumen ini?')) {
+                            removeDocumentItem(index);
+                        }
+                    });
+                }
+            }
+
+            function fillDocumentData(documentElement, data) {
+                const nameInput = documentElement.querySelector('.document-name');
+                const keyDisplay = documentElement.querySelector('.document-key-display');
+                const iconSelect = documentElement.querySelector('.document-icon');
+                const colorSelect = documentElement.querySelector('.document-color');
+                const maxSizeInput = documentElement.querySelector('.document-max-size');
+                const descriptionInput = documentElement.querySelector('.document-description');
+                const requiredCheckbox = documentElement.querySelector('.document-required');
+
+                if (nameInput) nameInput.value = data.name || '';
+                if (keyDisplay) keyDisplay.textContent = data.key || 'file_akan_dibuat_otomatis';
+                if (iconSelect) iconSelect.value = data.icon || '';
+                if (colorSelect) colorSelect.value = data.color || '';
+                if (maxSizeInput) maxSizeInput.value = data.max_size || 5;
+                if (descriptionInput) descriptionInput.value = data.description || '';
+                if (requiredCheckbox) requiredCheckbox.checked = data.required !== false;
+
+                // Set format checkboxes
+                if (data.formats && Array.isArray(data.formats)) {
+                    const formatCheckboxes = documentElement.querySelectorAll('.document-format');
+                    formatCheckboxes.forEach(cb => {
+                        cb.checked = data.formats.includes(cb.value);
+                    });
+                }
+            }
+
+            // Utility functions
             function removeFormField(index) {
                 if (formFieldsData[index] && formFieldsData[index].key) {
                     removeFromUsedKeys(formFieldsData[index].key, false);
                 }
-
                 formFieldsData.splice(index, 1);
                 updateFormFieldsDisplay();
                 updateFormFieldsVisibility();
             }
 
+            function removeDocumentItem(index) {
+                if (documentsData[index] && documentsData[index].key) {
+                    removeFromUsedKeys(documentsData[index].key, true);
+                }
+                documentsData.splice(index, 1);
+                updateDocumentsDisplay();
+                updateDocumentsVisibility();
+            }
+
             function updateFormFieldsDisplay() {
                 formFieldsContainer.innerHTML = '';
                 fieldCounter = 0;
-                // Rebuild used keys set
-                usedFieldKeys.clear();
-                formFieldsData.forEach((data, index) => {
-                    if (data.key) {
-                        usedFieldKeys.add(data.key);
-                    }
-                    addFormField(data);
-                });
+                formFieldsData.forEach((data, idx) => addFormField(data, idx));
+            }
+
+            function updateDocumentsDisplay() {
+                documentsContainer.innerHTML = '';
+                documentCounter = 0;
+                documentsData.forEach((data, idx) => addDocumentItem(data, idx));
             }
 
             function updateFormFieldsVisibility() {
                 formFieldsEmpty.style.display = formFieldsData.length === 0 ? 'block' : 'none';
             }
 
+            function updateDocumentsVisibility() {
+                documentsEmpty.style.display = documentsData.length === 0 ? 'block' : 'none';
+            }
+
             function loadDefaultFormFields() {
-                // Clear existing data and keys
-                formFieldsData = [];
+                if (!confirm('Ini akan mengganti semua field yang sudah ada. Lanjutkan?')) return;
+
+                // Clear existing
                 usedFieldKeys.clear();
 
-                const defaultFields = [
+                formFieldsData = [
                     {
                         name: 'Nama Lengkap',
                         key: 'nama_lengkap',
@@ -1045,259 +1192,24 @@
                         validation: 'required|min:10|max:15',
                         required: true,
                         options: []
-                    },
-                    {
-                        name: 'Fakultas',
-                        key: 'fakultas',
-                        type: 'text',
-                        icon: 'fas fa-university',
-                        placeholder: 'Contoh: Teknik',
-                        position: 'academic',
-                        validation: 'required|min:3|max:50',
-                        required: true,
-                        options: []
-                    },
-                    {
-                        name: 'Jurusan',
-                        key: 'jurusan',
-                        type: 'text',
-                        icon: 'fas fa-graduation-cap',
-                        placeholder: 'Contoh: Teknik Informatika',
-                        position: 'academic',
-                        validation: 'required|min:3|max:100',
-                        required: true,
-                        options: []
-                    },
-                    {
-                        name: 'Semester',
-                        key: 'semester',
-                        type: 'select',
-                        icon: 'fas fa-calendar-check',
-                        placeholder: '-- Pilih Semester --',
-                        position: 'academic',
-                        validation: 'required|between:1,14',
-                        required: true,
-                        options: [
-                            { value: '1', label: 'Semester 1' },
-                            { value: '2', label: 'Semester 2' },
-                            { value: '3', label: 'Semester 3' },
-                            { value: '4', label: 'Semester 4' },
-                            { value: '5', label: 'Semester 5' },
-                            { value: '6', label: 'Semester 6' },
-                            { value: '7', label: 'Semester 7' },
-                            { value: '8', label: 'Semester 8' }
-                        ]
-                    },
-                    {
-                        name: 'IPK',
-                        key: 'ipk',
-                        type: 'number',
-                        icon: 'fas fa-chart-line',
-                        placeholder: '3.50',
-                        position: 'academic',
-                        validation: 'required|numeric|between:0,4',
-                        required: true,
-                        options: []
-                    },
-                    {
-                        name: 'Alasan Mendaftar',
-                        key: 'alasan_mendaftar',
-                        type: 'textarea',
-                        icon: 'fas fa-comment-alt',
-                        placeholder: 'Jelaskan alasan dan motivasi Anda mendaftar beasiswa ini...',
-                        position: 'additional',
-                        validation: 'required|min:50|max:1000',
-                        required: true,
-                        options: []
                     }
                 ];
 
-                defaultFields.forEach(field => {
-                    formFieldsData.push(field);
+                formFieldsData.forEach(f => {
+                    if (f.key) usedFieldKeys.add(f.key);
                 });
 
                 updateFormFieldsDisplay();
                 updateFormFieldsVisibility();
             }
 
-            // Documents Management - Fixed
-            function addDocumentItem(data = null) {
-                documentCounter++;
-                const template = document.getElementById('documentTemplate');
-                const clone = template.content.cloneNode(true);
-
-                clone.querySelector('.item-number').textContent = documentCounter;
-                const documentElement = clone.querySelector('.dynamic-item');
-                documentElement.setAttribute('data-index', documentsData.length);
-
-                setupDocumentEvents(clone, documentsData.length);
-
-                if (data) {
-                    fillDocumentData(clone, data);
-                    if (data.key) {
-                        usedDocumentKeys.add(data.key);
-                    }
-                }
-
-                documentsContainer.appendChild(clone);
-
-                const newDocData = data || {
-                    name: '',
-                    key: '',
-                    icon: '',
-                    color: '',
-                    formats: [],
-                    max_size: 5,
-                    description: '',
-                    required: true
-                };
-
-                documentsData.push(newDocData);
-                updateDocumentsVisibility();
-
-                const newItem = documentsContainer.lastElementChild;
-                newItem.classList.add('new-item');
-                setTimeout(() => newItem.classList.remove('new-item'), 500);
-                newItem.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-
-            function setupDocumentEvents(documentElement, index) {
-                const nameInput = documentElement.querySelector('.document-name');
-                const keyDisplay = documentElement.querySelector('.document-key-display');
-                const iconSelect = documentElement.querySelector('.document-icon');
-                const colorSelect = documentElement.querySelector('.document-color');
-                const formatCheckboxes = documentElement.querySelectorAll('.document-format');
-                const maxSizeInput = documentElement.querySelector('.document-max-size');
-                const descriptionInput = documentElement.querySelector('.document-description');
-                const requiredCheckbox = documentElement.querySelector('.document-required');
-                const removeBtn = documentElement.querySelector('.remove-document-btn');
-
-                const previewIcon = documentElement.querySelector('.preview-icon i');
-                const previewName = documentElement.querySelector('.preview-name');
-                const previewDetails = documentElement.querySelector('.preview-details');
-                const previewRequired = documentElement.querySelector('.preview-required');
-
-                function updateDocumentData() {
-                    if (documentsData[index]) {
-                        // Generate key if name changed
-                        if (nameInput.value && nameInput.value !== documentsData[index].name) {
-                            if (documentsData[index].key) {
-                                removeFromUsedKeys(documentsData[index].key, true);
-                            }
-                            documentsData[index].key = generateUniqueDocumentKey(nameInput.value);
-                            keyDisplay.textContent = documentsData[index].key;
-                        }
-
-                        documentsData[index].name = nameInput.value;
-                        documentsData[index].icon = iconSelect.value;
-                        documentsData[index].color = colorSelect.value;
-                        documentsData[index].formats = Array.from(formatCheckboxes)
-                            .filter(cb => cb.checked)
-                            .map(cb => cb.value);
-                        documentsData[index].max_size = parseInt(maxSizeInput.value) || 5;
-                        documentsData[index].description = descriptionInput.value;
-                        documentsData[index].required = requiredCheckbox.checked;
-
-                        updatePreview();
-                    }
-                }
-
-                function updatePreview() {
-                    const data = documentsData[index];
-                    if (!data) return;
-
-                    // Reset icon classes
-                    previewIcon.className = '';
-                    previewIcon.classList.add(data.icon || 'fas', 'fa-file');
-                    previewIcon.classList.add(`text-${data.color || 'secondary'}`);
-                    previewIcon.style.fontSize = '2rem';
-
-                    previewName.textContent = data.name || 'Nama Dokumen';
-
-                    const formats = data.formats.length > 0
-                        ? data.formats.map(f => f.toUpperCase()).join(', ')
-                        : '-';
-                    previewDetails.textContent = `Format: ${formats} | Max: ${data.max_size}MB`;
-
-                    if (data.required) {
-                        previewRequired.innerHTML = '<span class="badge bg-warning text-dark">Wajib</span>';
-                    } else {
-                        previewRequired.innerHTML = '<span class="badge bg-secondary">Opsional</span>';
-                    }
-                }
-
-                // Event listeners
-                nameInput.addEventListener('input', updateDocumentData);
-                iconSelect.addEventListener('change', updateDocumentData);
-                colorSelect.addEventListener('change', updateDocumentData);
-                maxSizeInput.addEventListener('input', updateDocumentData);
-                descriptionInput.addEventListener('input', updateDocumentData);
-                requiredCheckbox.addEventListener('change', updateDocumentData);
-
-                formatCheckboxes.forEach(checkbox => {
-                    checkbox.addEventListener('change', updateDocumentData);
-                });
-
-                removeBtn.addEventListener('click', () => {
-                    if (confirm('Yakin ingin hapus dokumen ini?')) {
-                        removeDocumentItem(index);
-                    }
-                });
-
-                // Initial update
-                updatePreview();
-            }
-
-            function fillDocumentData(documentElement, data) {
-                documentElement.querySelector('.document-name').value = data.name || '';
-                documentElement.querySelector('.document-key-display').textContent = data.key || 'file_akan_dibuat_otomatis';
-                documentElement.querySelector('.document-icon').value = data.icon || '';
-                documentElement.querySelector('.document-color').value = data.color || '';
-                documentElement.querySelector('.document-max-size').value = data.max_size || 5;
-                documentElement.querySelector('.document-description').value = data.description || '';
-                documentElement.querySelector('.document-required').checked = data.required !== false;
-
-                if (data.formats && Array.isArray(data.formats)) {
-                    const formatCheckboxes = documentElement.querySelectorAll('.document-format');
-                    formatCheckboxes.forEach(checkbox => {
-                        checkbox.checked = data.formats.includes(checkbox.value);
-                    });
-                }
-            }
-
-            function removeDocumentItem(index) {
-                if (documentsData[index] && documentsData[index].key) {
-                    removeFromUsedKeys(documentsData[index].key, true);
-                }
-
-                documentsData.splice(index, 1);
-                updateDocumentsDisplay();
-                updateDocumentsVisibility();
-            }
-
-            function updateDocumentsDisplay() {
-                documentsContainer.innerHTML = '';
-                documentCounter = 0;
-                // Rebuild used keys set
-                usedDocumentKeys.clear();
-                documentsData.forEach((data, index) => {
-                    if (data.key) {
-                        usedDocumentKeys.add(data.key);
-                    }
-                    addDocumentItem(data);
-                });
-            }
-
-            function updateDocumentsVisibility() {
-                documentsEmpty.style.display = documentsData.length === 0 ? 'block' : 'none';
-            }
-
             function loadDefaultDocuments() {
-                // Clear existing data and keys
-                documentsData = [];
+                if (!confirm('Ini akan mengganti semua dokumen yang sudah ada. Lanjutkan?')) return;
+
+                // Clear existing
                 usedDocumentKeys.clear();
 
-                const defaultDocs = [
+                documentsData = [
                     {
                         name: 'Transkrip Nilai',
                         key: 'file_transkrip_nilai',
@@ -1317,43 +1229,37 @@
                         max_size: 5,
                         description: 'Kartu Tanda Penduduk',
                         required: true
-                    },
-                    {
-                        name: 'Kartu Keluarga',
-                        key: 'file_kartu_keluarga',
-                        icon: 'fas fa-users',
-                        color: 'green',
-                        formats: ['pdf', 'jpg', 'jpeg', 'png'],
-                        max_size: 5,
-                        description: 'Kartu Keluarga',
-                        required: true
                     }
                 ];
 
-                defaultDocs.forEach(doc => {
-                    documentsData.push(doc);
+                documentsData.forEach(d => {
+                    if (d.key) usedDocumentKeys.add(d.key);
                 });
 
                 updateDocumentsDisplay();
                 updateDocumentsVisibility();
             }
 
-            // Reset Form
             function resetForm() {
-                if (confirm('Yakin ingin reset semua data? Semua yang sudah diisi akan hilang.')) {
-                    beasiswaForm.reset();
-                    formFieldsData = [];
-                    documentsData = [];
-                    usedFieldKeys.clear();
-                    usedDocumentKeys.clear();
-                    updateFormFieldsDisplay();
-                    updateDocumentsDisplay();
-                    updateFormFieldsVisibility();
-                    updateDocumentsVisibility();
+                if (confirm('Yakin ingin reset ke data asli? Semua perubahan akan hilang.')) {
+                    location.reload();
                 }
             }
 
-            // Form Submission
+            // Initial setup
+            updateFormFieldsDisplay();
+            updateDocumentsDisplay();
+            updateFormFieldsVisibility();
+            updateDocumentsVisibility();
+
+            // Event bindings
+            addFieldBtn.addEventListener('click', () => addFormField());
+            loadDefaultFieldsBtn.addEventListener('click', loadDefaultFormFields);
+            addDocumentBtn.addEventListener('click', () => addDocumentItem());
+            loadDefaultDocsBtn.addEventListener('click', loadDefaultDocuments);
+            resetFormBtn.addEventListener('click', resetForm);
+
+            // Form submission - FIXED VERSION
             beasiswaForm.addEventListener('submit', function (e) {
                 e.preventDefault();
 
@@ -1362,212 +1268,42 @@
                     alert('Minimal harus ada 1 field form yang dikonfigurasi.');
                     return;
                 }
-
                 if (documentsData.length === 0) {
                     alert('Minimal harus ada 1 dokumen yang diperlukan.');
                     return;
                 }
 
-                // Remove existing hidden inputs
-                const existingInputs = beasiswaForm.querySelectorAll('input[name^="form_fields"], input[name^="documents"]');
-                existingInputs.forEach(input => input.remove());
+                // Clean and validate data before submission
+                const cleanFormFields = formFieldsData.map(field => ({
+                    name: field.name || '',
+                    key: field.key || '',
+                    type: field.type || '',
+                    icon: field.icon || '',
+                    placeholder: field.placeholder || '',
+                    position: field.position || '',
+                    validation: field.validation || '',
+                    required: Boolean(field.required),
+                    options: Array.isArray(field.options) ? field.options : []
+                })).filter(field => field.name && field.key && field.type);
 
-                // Add form fields data as hidden inputs
-                formFieldsData.forEach((field, index) => {
-                    const fields = ['name', 'key', 'type', 'icon', 'placeholder', 'position', 'validation', 'required'];
+                const cleanDocuments = documentsData.map(doc => ({
+                    name: doc.name || '',
+                    key: doc.key || '',
+                    icon: doc.icon || '',
+                    color: doc.color || '',
+                    formats: Array.isArray(doc.formats) ? doc.formats : [],
+                    max_size: parseInt(doc.max_size) || 5,
+                    description: doc.description || '',
+                    required: Boolean(doc.required)
+                })).filter(doc => doc.name && doc.key && doc.formats.length > 0);
 
-                    fields.forEach(fieldName => {
-                        const input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = `form_fields[${index}][${fieldName}]`;
+                // Set JSON data to hidden inputs
+                document.getElementById('form_fields_json').value = JSON.stringify(cleanFormFields);
+                document.getElementById('required_documents_json').value = JSON.stringify(cleanDocuments);
 
-                        if (fieldName === 'required') {
-                            input.value = field[fieldName] ? '1' : '0';
-                        } else {
-                            input.value = field[fieldName] || '';
-                        }
-
-                        beasiswaForm.appendChild(input);
-                    });
-
-                    // Add options for select/radio/checkbox fields
-                    if (field.options && Array.isArray(field.options)) {
-                        field.options.forEach((option, optionIndex) => {
-                            const valueInput = document.createElement('input');
-                            valueInput.type = 'hidden';
-                            valueInput.name = `form_fields[${index}][options][${optionIndex}][value]`;
-                            valueInput.value = option.value || '';
-                            beasiswaForm.appendChild(valueInput);
-
-                            const labelInput = document.createElement('input');
-                            labelInput.type = 'hidden';
-                            labelInput.name = `form_fields[${index}][options][${optionIndex}][label]`;
-                            labelInput.value = option.label || '';
-                            beasiswaForm.appendChild(labelInput);
-                        });
-                    }
-                });
-
-                // Add documents data as hidden inputs
-                documentsData.forEach((doc, index) => {
-                    const fields = ['name', 'key', 'icon', 'color', 'max_size', 'description', 'required'];
-
-                    fields.forEach(field => {
-                        const input = document.createElement('input');
-                        input.type = 'hidden';
-                        input.name = `documents[${index}][${field}]`;
-
-                        if (field === 'required') {
-                            input.value = doc[field] ? '1' : '0';
-                        } else {
-                            input.value = doc[field] || '';
-                        }
-
-                        beasiswaForm.appendChild(input);
-                    });
-
-                    // Add formats array as hidden inputs
-                    if (doc.formats && Array.isArray(doc.formats)) {
-                        doc.formats.forEach((format, formatIndex) => {
-                            const formatInput = document.createElement('input');
-                            formatInput.type = 'hidden';
-                            formatInput.name = `documents[${index}][formats][${formatIndex}]`;
-                            formatInput.value = format;
-                            beasiswaForm.appendChild(formatInput);
-                        });
-                    }
-                });
-
-                // Show loading state
-                const submitBtn = beasiswaForm.querySelector('button[type="submit"]');
-                const originalContent = submitBtn.innerHTML;
-                submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Menyimpan...';
-
-                // Submit form via fetch or normal submission
-                const formData = new FormData(beasiswaForm);
-
-                fetch(beasiswaForm.action, {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                    }
-                })
-                    .then(response => {
-                        if (response.ok) {
-                            return response.text();
-                        }
-                        throw new Error('Network response was not ok');
-                    })
-                    .then(data => {
-                        // Check if response indicates success
-                        if (data.includes('Beasiswa berhasil ditambahkan') || data.includes('redirect')) {
-                            // Redirect to index page
-                            window.location.href = beasiswaForm.action.replace('/store', '');
-                        } else {
-                            // Handle form errors by submitting normally
-                            beasiswaForm.submit();
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error:', error);
-                        // Fallback to normal form submission
-                        beasiswaForm.submit();
-                    })
-                    .finally(() => {
-                        // Reset loading state
-                        submitBtn.disabled = false;
-                        submitBtn.innerHTML = originalContent;
-                    });
+                // Submit the form
+                beasiswaForm.submit();
             });
-
-            // Helper function to validate form data
-            function validateFormData() {
-                let isValid = true;
-                let errors = [];
-
-                // Validate form fields
-                formFieldsData.forEach((field, index) => {
-                    if (!field.name || field.name.trim() === '') {
-                        errors.push(`Field ${index + 1}: Nama field wajib diisi`);
-                        isValid = false;
-                    }
-                    if (!field.type || field.type === '') {
-                        errors.push(`Field ${index + 1}: Tipe field wajib dipilih`);
-                        isValid = false;
-                    }
-                    if (!field.icon || field.icon === '') {
-                        errors.push(`Field ${index + 1}: Icon wajib dipilih`);
-                        isValid = false;
-                    }
-                    if (!field.position || field.position === '') {
-                        errors.push(`Field ${index + 1}: Posisi wajib dipilih`);
-                        isValid = false;
-                    }
-
-                    // Validate options for select/radio/checkbox
-                    if (['select', 'radio', 'checkbox'].includes(field.type)) {
-                        if (!field.options || field.options.length === 0) {
-                            errors.push(`Field ${index + 1}: Minimal harus ada 1 opsi untuk tipe ${field.type}`);
-                            isValid = false;
-                        } else {
-                            field.options.forEach((option, optIndex) => {
-                                if (!option.value || !option.label) {
-                                    errors.push(`Field ${index + 1}, Opsi ${optIndex + 1}: Value dan label wajib diisi`);
-                                    isValid = false;
-                                }
-                            });
-                        }
-                    }
-                });
-
-                // Validate documents
-                documentsData.forEach((doc, index) => {
-                    if (!doc.name || doc.name.trim() === '') {
-                        errors.push(`Dokumen ${index + 1}: Nama dokumen wajib diisi`);
-                        isValid = false;
-                    }
-                    if (!doc.icon || doc.icon === '') {
-                        errors.push(`Dokumen ${index + 1}: Icon wajib dipilih`);
-                        isValid = false;
-                    }
-                    if (!doc.color || doc.color === '') {
-                        errors.push(`Dokumen ${index + 1}: Warna icon wajib dipilih`);
-                        isValid = false;
-                    }
-                    if (!doc.formats || doc.formats.length === 0) {
-                        errors.push(`Dokumen ${index + 1}: Minimal harus ada 1 format file`);
-                        isValid = false;
-                    }
-                    if (!doc.max_size || doc.max_size < 1 || doc.max_size > 10) {
-                        errors.push(`Dokumen ${index + 1}: Ukuran maksimal harus antara 1-10 MB`);
-                        isValid = false;
-                    }
-                });
-
-                if (!isValid) {
-                    alert('Error validasi:\n' + errors.join('\n'));
-                }
-
-                return isValid;
-            }
-
-            // Export data functions for debugging
-            window.getFormFieldsData = function () {
-                return formFieldsData;
-            };
-
-            window.getDocumentsData = function () {
-                return documentsData;
-            };
-
-            window.getUsedKeys = function () {
-                return {
-                    fieldKeys: Array.from(usedFieldKeys),
-                    documentKeys: Array.from(usedDocumentKeys)
-                };
-            };
         });
     </script>
 @endsection
