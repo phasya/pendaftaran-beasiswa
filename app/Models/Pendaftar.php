@@ -144,20 +144,7 @@ class Pendaftar extends Model
     /**
      * Legacy accessors for backward compatibility
      */
-    public function getFileTranskripAttribute()
-    {
-        return $this->getDocument('file_transkrip');
-    }
-
-    public function getFileKtpAttribute()
-    {
-        return $this->getDocument('file_ktp');
-    }
-
-    public function getFileKkAttribute()
-    {
-        return $this->getDocument('file_kk');
-    }
+    
 
     /**
      * Scope untuk get aplikasi yang bisa resubmit

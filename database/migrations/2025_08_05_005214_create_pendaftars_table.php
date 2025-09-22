@@ -16,7 +16,7 @@ return new class extends Migration {
             $table->date('tanggal_tutup');
             $table->enum('status', ['aktif', 'nonaktif'])->default('aktif');
             $table->text('persyaratan');
-            $table->json('form_fields')->nullable(); // KOLOM INI YANG HILANG
+            $table->json('form_fields')->nullable(); 
             $table->json('required_documents')->nullable();
             $table->timestamps();
         });

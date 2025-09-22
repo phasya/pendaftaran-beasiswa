@@ -1190,7 +1190,7 @@ document.addEventListener('DOMContentLoaded', function () {
             fields.forEach(field => {
                 const input = document.createElement('input');
                 input.type = 'hidden';
-                input.name = `documents[${index}][${field}]`;
+                input.name = `required_documents[${index}][${field}]`;
                 input.value = field === 'required' ? (doc[field] ? '1' : '0') : (doc[field] || '');
                 beasiswaForm.appendChild(input);
             });
@@ -1199,7 +1199,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 doc.formats.forEach((format, formatIndex) => {
                     const input = document.createElement('input');
                     input.type = 'hidden';
-                    input.name = `documents[${index}][formats][${formatIndex}]`;
+                    input.name = `required_documents[${index}][formats][${formatIndex}]`;
                     input.value = format;
                     beasiswaForm.appendChild(input);
                 });

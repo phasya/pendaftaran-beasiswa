@@ -32,6 +32,10 @@ class Beasiswa extends Model
         'dynamic_fields' => 'array'
     ];
 
+    // Cache untuk menghindari reprocessing
+    private $processedDocuments = null;
+    private $processedFormFields = null;
+
     public function pendaftars()
     {
         return $this->hasMany(Pendaftar::class);
@@ -77,6 +81,187 @@ class Beasiswa extends Model
         }
 
         return $key;
+    }
+
+    /**
+     * Get raw required documents attribute without processing
+     */
+    public function getRawRequiredDocumentsAttribute()
+    {
+        $rawValue = $this->attributes['required_documents'] ?? null;
+
+        if (is_null($rawValue) || $rawValue === '') {
+            return [];
+        }
+
+        if (is_string($rawValue)) {
+            $decoded = json_decode($rawValue, true);
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        return is_array($rawValue) ? $rawValue : [];
+    }
+
+    /**
+     * Get required documents with validation and auto-processing (FIXED VERSION)
+     */
+    public function getRequiredDocumentsAttribute($value)
+    {
+        // Return cached version if available
+        if ($this->processedDocuments !== null) {
+            return $this->processedDocuments;
+        }
+
+        // Get raw data
+        $rawData = $this->getRawRequiredDocumentsAttribute();
+
+        if (empty($rawData)) {
+            $this->processedDocuments = $this->getDefaultDocuments();
+            return $this->processedDocuments;
+        }
+
+        // Process and clean duplicates
+        $this->processedDocuments = $this->processAndCleanDocuments($rawData);
+        return $this->processedDocuments;
+    }
+
+    /**
+     * Process and clean documents - prevent duplicates
+     */
+    private function processAndCleanDocuments($documents)
+    {
+        if (!is_array($documents)) {
+            return $this->getDefaultDocuments();
+        }
+
+        $processedDocs = [];
+        $usedKeys = [];
+        $usedNames = [];
+
+        foreach ($documents as $doc) {
+            if (!is_array($doc) || empty($doc['name'])) {
+                continue; // Skip invalid documents
+            }
+
+            $docName = trim($doc['name']);
+            $docKey = trim($doc['key'] ?? '');
+
+            // Skip if name already processed
+            $lowerName = strtolower($docName);
+            if (in_array($lowerName, $usedNames)) {
+                continue;
+            }
+
+            // Generate unique key if not provided or duplicate
+            if (empty($docKey) || in_array($docKey, $usedKeys)) {
+                $docKey = self::generateUniqueKey($docName, $usedKeys, 'file');
+            }
+
+            $usedKeys[] = $docKey;
+            $usedNames[] = $lowerName;
+
+            // Process formats array
+            $formats = [];
+            if (!empty($doc['formats']) && is_array($doc['formats'])) {
+                $formats = array_filter($doc['formats'], function ($format) {
+                    return in_array(strtolower($format), ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx']);
+                });
+            }
+
+            if (empty($formats)) {
+                $formats = ['pdf']; // Default format
+            }
+
+            $processedDocs[] = [
+                'name' => $docName,
+                'key' => $docKey,
+                'icon' => $doc['icon'] ?? 'fas fa-file',
+                'color' => $doc['color'] ?? 'gray',
+                'formats' => array_values(array_unique($formats)),
+                'max_size' => max(1, min(10, (int) ($doc['max_size'] ?? 5))),
+                'description' => $doc['description'] ?? '',
+                'required' => (bool) ($doc['required'] ?? true)
+            ];
+        }
+
+        return empty($processedDocs) ? $this->getDefaultDocuments() : $processedDocs;
+    }
+
+    /**
+     * Set required documents attribute with processing
+     */
+    public function setRequiredDocumentsAttribute($value)
+    {
+        // Clear cache
+        $this->processedDocuments = null;
+
+        if (is_null($value)) {
+            $this->attributes['required_documents'] = json_encode($this->getDefaultDocuments());
+        } elseif (is_array($value)) {
+            $processed = $this->processAndCleanDocuments($value);
+            $this->attributes['required_documents'] = json_encode($processed);
+        } else {
+            $this->attributes['required_documents'] = $value;
+        }
+    }
+
+    /**
+     * Clean duplicate data manually
+     */
+    public function cleanDuplicateData()
+    {
+        // Clear cache
+        $this->processedDocuments = null;
+        $this->processedFormFields = null;
+
+        // Get raw data and clean
+        $rawDocs = $this->getRawRequiredDocumentsAttribute();
+        $cleanedDocs = $this->processAndCleanDocuments($rawDocs);
+
+        // Save cleaned data
+        $this->attributes['required_documents'] = json_encode($cleanedDocs);
+        $this->save();
+
+        return $this;
+    }
+
+    /**
+     * Get default documents structure
+     */
+    private function getDefaultDocuments()
+    {
+        return [
+            [
+                'name' => 'Transkrip Nilai',
+                'key' => 'file_transkrip_nilai',
+                'icon' => 'fas fa-file-pdf',
+                'color' => 'red',
+                'formats' => ['pdf'],
+                'max_size' => 5,
+                'required' => true,
+                'description' => 'Transkrip nilai terbaru'
+            ],
+            [
+                'name' => 'KTP',
+                'key' => 'file_ktp',
+                'icon' => 'fas fa-id-card',
+                'color' => 'blue',
+                'formats' => ['pdf', 'jpg', 'jpeg', 'png'],
+                'max_size' => 5,
+                'required' => true,
+                'description' => 'Kartu Tanda Penduduk'
+            ],
+            [
+                'name' => 'Kartu Keluarga',
+                'key' => 'file_kartu_keluarga',
+                'icon' => 'fas fa-users',
+                'color' => 'green',
+                'formats' => ['pdf', 'jpg', 'jpeg', 'png'],
+                'max_size' => 5,
+                'required' => true,
+                'description' => 'Kartu Keluarga'
+            ]
+        ];
     }
 
     /**
@@ -147,61 +332,6 @@ class Beasiswa extends Model
     }
 
     /**
-     * Process and auto-generate keys for required documents
-     */
-    public function processRequiredDocuments($documents)
-    {
-        if (!is_array($documents)) {
-            return $this->getDefaultDocuments();
-        }
-
-        $processedDocs = [];
-        $usedKeys = [];
-
-        foreach ($documents as $doc) {
-            if (empty($doc['name'])) {
-                continue; // Skip documents without names
-            }
-
-            // Generate unique key if not provided or empty
-            if (empty($doc['key'])) {
-                $doc['key'] = self::generateUniqueKey($doc['name'], $usedKeys, 'file');
-            } else {
-                // Sanitize existing key
-                $doc['key'] = $this->sanitizeKey($doc['key'], 'file');
-
-                // Ensure uniqueness
-                if (in_array($doc['key'], $usedKeys)) {
-                    $doc['key'] = self::generateUniqueKey($doc['name'], $usedKeys, 'file');
-                }
-            }
-
-            $usedKeys[] = $doc['key'];
-
-            // Process formats array
-            $formats = [];
-            if (!empty($doc['formats']) && is_array($doc['formats'])) {
-                $formats = array_filter($doc['formats'], function ($format) {
-                    return in_array(strtolower($format), ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx']);
-                });
-            }
-
-            $processedDocs[] = [
-                'name' => $doc['name'] ?? '',
-                'key' => $doc['key'],
-                'icon' => $doc['icon'] ?? 'fas fa-file',
-                'color' => $doc['color'] ?? 'gray',
-                'formats' => array_values($formats),
-                'max_size' => max(1, min(10, (int) ($doc['max_size'] ?? 5))),
-                'description' => $doc['description'] ?? '',
-                'required' => (bool) ($doc['required'] ?? true)
-            ];
-        }
-
-        return empty($processedDocs) ? $this->getDefaultDocuments() : $processedDocs;
-    }
-
-    /**
      * Sanitize key to ensure it's database/form safe
      */
     private function sanitizeKey($key, $prefix = '')
@@ -259,45 +389,6 @@ class Beasiswa extends Model
             $this->attributes['form_fields'] = json_encode($processed);
         } else {
             $this->attributes['form_fields'] = $value;
-        }
-    }
-
-    /**
-     * Get required documents with validation and auto-processing
-     */
-    public function getRequiredDocumentsAttribute($value)
-    {
-        if (is_null($value) || $value === '') {
-            return $this->getDefaultDocuments();
-        }
-
-        if (is_array($value)) {
-            return empty($value) ? $this->getDefaultDocuments() : $this->processRequiredDocuments($value);
-        }
-
-        // If string (JSON), decode it
-        $decoded = json_decode($value, true);
-
-        // Return default documents if none set or invalid
-        if (!is_array($decoded) || empty($decoded)) {
-            return $this->getDefaultDocuments();
-        }
-
-        return $this->processRequiredDocuments($decoded);
-    }
-
-    /**
-     * Set required documents attribute with processing
-     */
-    public function setRequiredDocumentsAttribute($value)
-    {
-        if (is_null($value)) {
-            $this->attributes['required_documents'] = json_encode($this->getDefaultDocuments());
-        } elseif (is_array($value)) {
-            $processed = $this->processRequiredDocuments($value);
-            $this->attributes['required_documents'] = json_encode($processed);
-        } else {
-            $this->attributes['required_documents'] = $value;
         }
     }
 
@@ -394,17 +485,6 @@ class Beasiswa extends Model
                 ]
             ],
             [
-                'name' => 'IPK',
-                'key' => 'ipk',
-                'type' => 'number',
-                'icon' => 'fas fa-chart-line',
-                'placeholder' => '3.50',
-                'position' => 'academic',
-                'validation' => 'required|numeric|between:0,4',
-                'required' => true,
-                'options' => []
-            ],
-            [
                 'name' => 'Alasan Mendaftar',
                 'key' => 'alasan_mendaftar',
                 'type' => 'textarea',
@@ -418,48 +498,8 @@ class Beasiswa extends Model
         ];
     }
 
-    /**
-     * Get default documents structure
-     */
-    private function getDefaultDocuments()
-    {
-        return [
-            [
-                'name' => 'Transkrip Nilai',
-                'key' => 'file_transkrip_nilai',
-                'icon' => 'fas fa-file-pdf',
-                'color' => 'red',
-                'formats' => ['pdf'],
-                'max_size' => 5,
-                'required' => true,
-                'description' => 'Transkrip nilai terbaru'
-            ],
-            [
-                'name' => 'KTP',
-                'key' => 'file_ktp',
-                'icon' => 'fas fa-id-card',
-                'color' => 'blue',
-                'formats' => ['pdf', 'jpg', 'jpeg', 'png'],
-                'max_size' => 5,
-                'required' => true,
-                'description' => 'Kartu Tanda Penduduk'
-            ],
-            [
-                'name' => 'Kartu Keluarga',
-                'key' => 'file_kartu_keluarga',
-                'icon' => 'fas fa-users',
-                'color' => 'green',
-                'formats' => ['pdf', 'jpg', 'jpeg', 'png'],
-                'max_size' => 5,
-                'required' => true,
-                'description' => 'Kartu Keluarga'
-            ]
-        ];
-    }
+    // ... rest of the methods remain the same
 
-    /**
-     * Get form fields grouped by position
-     */
     public function getFormFieldsByPosition()
     {
         $fields = $this->form_fields;
@@ -481,9 +521,6 @@ class Beasiswa extends Model
         return $grouped;
     }
 
-    /**
-     * Get validation rules for form fields
-     */
     public function getFormFieldValidationRules()
     {
         $rules = [];
@@ -544,42 +581,11 @@ class Beasiswa extends Model
         return $rules;
     }
 
-    /**
-     * Get validation messages for form fields
-     */
-    public function getFormFieldValidationMessages()
-    {
-        $messages = [];
-
-        foreach ($this->form_fields as $field) {
-            $key = $field['key'];
-            $name = $field['name'];
-
-            $messages["{$key}.required"] = "Field {$name} wajib diisi.";
-            $messages["{$key}.email"] = "Format {$name} tidak valid.";
-            $messages["{$key}.numeric"] = "{$name} harus berupa angka.";
-            $messages["{$key}.date"] = "Format {$name} harus berupa tanggal yang valid.";
-            $messages["{$key}.min"] = "{$name} minimal harus berisi :min karakter.";
-            $messages["{$key}.max"] = "{$name} maksimal berisi :max karakter.";
-            $messages["{$key}.between"] = "{$name} harus berada di antara :min dan :max.";
-            $messages["{$key}.in"] = "{$name} harus memilih salah satu opsi yang tersedia.";
-            $messages["{$key}.array"] = "{$name} harus berupa pilihan yang valid.";
-        }
-
-        return $messages;
-    }
-
-    /**
-     * Get required document keys for validation
-     */
     public function getRequiredDocumentKeys()
     {
         return collect($this->required_documents)->pluck('key')->toArray();
     }
 
-    /**
-     * Get validation rules for documents
-     */
     public function getDocumentValidationRules()
     {
         $rules = [];
@@ -609,6 +615,16 @@ class Beasiswa extends Model
         return $rules;
     }
 
+    public function getDocumentByKey($key)
+    {
+        return collect($this->required_documents)->firstWhere('key', $key);
+    }
+
+    public function hasDocument($key)
+    {
+        return !is_null($this->getDocumentByKey($key));
+    }
+
     /**
      * Get document validation messages
      */
@@ -631,6 +647,31 @@ class Beasiswa extends Model
             if (!empty($document['max_size'])) {
                 $messages["{$key}.max"] = "Ukuran {$name} maksimal {$document['max_size']}MB.";
             }
+        }
+
+        return $messages;
+    }
+
+    /**
+     * Get validation messages for form fields
+     */
+    public function getFormFieldValidationMessages()
+    {
+        $messages = [];
+
+        foreach ($this->form_fields as $field) {
+            $key = $field['key'];
+            $name = $field['name'];
+
+            $messages["{$key}.required"] = "Field {$name} wajib diisi.";
+            $messages["{$key}.email"] = "Format {$name} tidak valid.";
+            $messages["{$key}.numeric"] = "{$name} harus berupa angka.";
+            $messages["{$key}.date"] = "Format {$name} harus berupa tanggal yang valid.";
+            $messages["{$key}.min"] = "{$name} minimal harus berisi :min karakter.";
+            $messages["{$key}.max"] = "{$name} maksimal berisi :max karakter.";
+            $messages["{$key}.between"] = "{$name} harus berada di antara :min dan :max.";
+            $messages["{$key}.in"] = "{$name} harus memilih salah satu opsi yang tersedia.";
+            $messages["{$key}.array"] = "{$name} harus berupa pilihan yang valid.";
         }
 
         return $messages;
@@ -765,7 +806,7 @@ class Beasiswa extends Model
         $this->attributes['form_fields'] = json_encode($fixedFormFields);
 
         // Fix documents
-        $fixedDocuments = $this->processRequiredDocuments($this->attributes['required_documents'] ?? []);
+        $fixedDocuments = $this->processAndCleanDocuments($this->attributes['required_documents'] ?? []);
         $this->attributes['required_documents'] = json_encode($fixedDocuments);
 
         return $this;
@@ -780,26 +821,10 @@ class Beasiswa extends Model
     }
 
     /**
-     * Get document by key
-     */
-    public function getDocumentByKey($key)
-    {
-        return collect($this->required_documents)->firstWhere('key', $key);
-    }
-
-    /**
      * Check if field exists
      */
     public function hasFormField($key)
     {
         return !is_null($this->getFormFieldByKey($key));
-    }
-
-    /**
-     * Check if document exists
-     */
-    public function hasDocument($key)
-    {
-        return !is_null($this->getDocumentByKey($key));
     }
 }
