@@ -345,7 +345,7 @@
                         @csrf
 
                         {{-- Debug Information --}}
-                        @if(config('app.debug') && $beasiswa->form_fields)
+                        {{--  @if(config('app.debug') && $beasiswa->form_fields)
                             <div class="debug-info">
                                 <strong>Debug - Form Fields Available:</strong><br>
                                 Total fields: {{ is_array($beasiswa->form_fields) ? count($beasiswa->form_fields) : 'Not an array' }}<br>
@@ -355,7 +355,7 @@
                                     @endforeach
                                 @endif
                             </div>
-                        @endif
+                        @endif --}}
 
                         {{-- Render Dynamic Form Fields by Position --}}
                         @if($beasiswa->form_fields && is_array($beasiswa->form_fields) && count($beasiswa->form_fields) > 0)
