@@ -88,11 +88,19 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::post('bulk-clean', [AdminBeasiswaController::class, 'bulkClean'])->name('bulk-clean');
     });
 
-    // Pendaftar Management
+    // Admin Pendaftar Management
     Route::resource('pendaftar', AdminPendaftarController::class)->except(['create', 'store']);
     Route::controller(AdminPendaftarController::class)->prefix('pendaftar')->name('pendaftar.')->group(function () {
         Route::get('{pendaftar}/rejection-history', 'getRejectionHistory')->name('rejection-history');
         Route::patch('{pendaftar}/status', 'updateStatus')->name('update-status');
+    });
+
+    // User Pendaftar Routes (di luar grup admin)
+    Route::controller(PendaftarController::class)->group(function () {
+        Route::get('beasiswa/{beasiswa}/daftar', 'create')->name('pendaftar.create');
+        Route::post('beasiswa/{beasiswa}/daftar', 'store')->name('pendaftar.store');
+        Route::get('pendaftar/{pendaftar}/resubmit', 'resubmit')->name('pendaftar.resubmit');
+        Route::put('pendaftar/{pendaftar}/resubmit', 'resubmitStore')->name('pendaftar.resubmit.store');
     });
 
     // Temporary Fix Routes (untuk development/debugging)

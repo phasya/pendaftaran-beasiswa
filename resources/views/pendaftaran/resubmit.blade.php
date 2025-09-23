@@ -201,16 +201,6 @@
         white-space: nowrap !important;
         border: 0 !important;
     }
-
-    .debug-info {
-        background: #f8f9fa;
-        border: 1px solid #dee2e6;
-        border-radius: 8px;
-        padding: 15px;
-        margin-bottom: 20px;
-        font-family: monospace;
-        font-size: 12px;
-    }
 </style>
 
 <div class="container mx-auto px-4 py-8">
@@ -224,69 +214,26 @@
             <p class="text-amber-700">Perbaiki data Anda dan ajukan kembali</p>
         </div>
 
-        <!-- DEBUG INFORMATION -->
-        <div class="debug-info">
-            <h4><strong>DEBUG INFO:</strong></h4>
-            @php
-                // Debug beasiswa data
-                $beasiswa = $pendaftar->beasiswa;
-                echo "<p><strong>Beasiswa ID:</strong> " . $beasiswa->id . "</p>";
-                echo "<p><strong>Beasiswa Name:</strong> " . $beasiswa->nama_beasiswa . "</p>";
-                
-                // Check form_fields
-                if (isset($beasiswa->form_fields)) {
-                    echo "<p><strong>Form Fields Found:</strong> YES</p>";
-                    if (is_string($beasiswa->form_fields)) {
-                        $decoded = json_decode($beasiswa->form_fields, true);
-                        echo "<p><strong>Form Fields Count:</strong> " . (is_array($decoded) ? count($decoded) : 0) . "</p>";
-                        echo "<p><strong>Form Fields JSON Valid:</strong> " . (json_last_error() === JSON_ERROR_NONE ? 'YES' : 'NO') . "</p>";
-                    } else {
-                        echo "<p><strong>Form Fields Type:</strong> " . gettype($beasiswa->form_fields) . "</p>";
-                        if (is_array($beasiswa->form_fields)) {
-                            echo "<p><strong>Form Fields Count:</strong> " . count($beasiswa->form_fields) . "</p>";
-                        }
-                    }
-                } else {
-                    echo "<p><strong>Form Fields Found:</strong> NO</p>";
-                }
-                
-                // Check method existence
-                echo "<p><strong>getRawFormFieldsAttribute Method:</strong> " . (method_exists($beasiswa, 'getRawFormFieldsAttribute') ? 'YES' : 'NO') . "</p>";
-                
-                // Check current form data
-                if (isset($pendaftar->form_data)) {
-                    if (is_string($pendaftar->form_data)) {
-                        $currentFormData = json_decode($pendaftar->form_data, true);
-                        echo "<p><strong>Current Form Data Count:</strong> " . (is_array($currentFormData) ? count($currentFormData) : 0) . "</p>";
-                    } else {
-                        echo "<p><strong>Current Form Data Type:</strong> " . gettype($pendaftar->form_data) . "</p>";
-                    }
-                }
-            @endphp
-        </div>
-
         <!-- Previous Rejection Info -->
-        @if($pendaftar->rejection_reason)
-            <div class="bg-red-50 border-l-4 border-red-500 p-6 mb-8 rounded-r-lg">
-                <div class="flex items-start">
-                    <div class="flex-shrink-0">
-                        <i class="fas fa-info-circle text-red-500 text-xl"></i>
+        <div class="bg-red-50 border-l-4 border-red-500 p-6 mb-8 rounded-r-lg">
+            <div class="flex items-start">
+                <div class="flex-shrink-0">
+                    <i class="fas fa-info-circle text-red-500 text-xl"></i>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-lg font-semibold text-red-800 mb-2">Alasan Penolakan Sebelumnya</h3>
+                    <div class="bg-white border border-red-200 rounded-lg p-4">
+                        <p class="text-red-800">{{ $pendaftar->rejection_reason }}</p>
                     </div>
-                    <div class="ml-3">
-                        <h3 class="text-lg font-semibold text-red-800 mb-2">Alasan Penolakan Sebelumnya</h3>
-                        <div class="bg-white border border-red-200 rounded-lg p-4">
-                            <p class="text-red-800">{{ $pendaftar->rejection_reason }}</p>
-                        </div>
-                        <div class="mt-3">
-                            <span class="text-sm text-red-700">
-                                <i class="fas fa-calendar mr-1"></i>Ditolak pada:
-                                {{ $pendaftar->rejection_date ? \Carbon\Carbon::parse($pendaftar->rejection_date)->format('d M Y H:i') : '-' }}
-                            </span>
-                        </div>
+                    <div class="mt-3">
+                        <span class="text-sm text-red-700">
+                            <i class="fas fa-calendar mr-1"></i>Ditolak pada:
+                            {{ $pendaftar->rejected_at ? $pendaftar->rejected_at->format('d M Y H:i') : '-' }}
+                        </span>
                     </div>
                 </div>
             </div>
-        @endif
+        </div>
 
         <!-- Show validation errors if any -->
         @if ($errors->any())
@@ -325,60 +272,28 @@
                             $currentFormData = is_string($pendaftar->form_data) ? json_decode($pendaftar->form_data, true) ?: [] : (is_array($pendaftar->form_data) ? $pendaftar->form_data : []);
                         }
 
-                        // Process beasiswa form fields - TRY MULTIPLE APPROACHES
-                        $beasiswa = $pendaftar->beasiswa;
-                        $rawFormFields = [];
-                        
-                        // Method 1: Try getRawFormFieldsAttribute method
-                        if (method_exists($beasiswa, 'getRawFormFieldsAttribute')) {
-                            $rawFormFields = $beasiswa->getRawFormFieldsAttribute() ?: [];
-                            echo "<div class='debug-info'><p><strong>Method 1 (getRawFormFieldsAttribute):</strong> " . count($rawFormFields) . " fields found</p></div>";
-                        }
-                        
-                        // Method 2: Try direct attribute access if Method 1 failed
-                        if (empty($rawFormFields) && isset($beasiswa->form_fields)) {
-                            if (is_string($beasiswa->form_fields)) {
-                                $rawFormFields = json_decode($beasiswa->form_fields, true) ?: [];
-                            } elseif (is_array($beasiswa->form_fields)) {
-                                $rawFormFields = $beasiswa->form_fields;
-                            }
-                            echo "<div class='debug-info'><p><strong>Method 2 (direct access):</strong> " . count($rawFormFields) . " fields found</p></div>";
-                        }
-                        
-                        // Method 3: Try attributes array access if Method 2 failed
-                        if (empty($rawFormFields) && isset($beasiswa->attributes['form_fields'])) {
-                            $formFieldsJson = $beasiswa->attributes['form_fields'];
-                            if (is_string($formFieldsJson)) {
-                                $rawFormFields = json_decode($formFieldsJson, true) ?: [];
-                            }
-                            echo "<div class='debug-info'><p><strong>Method 3 (attributes access):</strong> " . count($rawFormFields) . " fields found</p></div>";
-                        }
-                        
-                        // Method 4: Try getOriginal if Method 3 failed
-                        if (empty($rawFormFields) && method_exists($beasiswa, 'getOriginal')) {
-                            $original = $beasiswa->getOriginal('form_fields');
-                            if (is_string($original)) {
-                                $rawFormFields = json_decode($original, true) ?: [];
-                                echo "<div class='debug-info'><p><strong>Method 4 (getOriginal):</strong> " . count($rawFormFields) . " fields found</p></div>";
-                            }
-                        }
-
-                        // Debug the final result
-                        echo "<div class='debug-info'><p><strong>Final rawFormFields count:</strong> " . count($rawFormFields) . "</p>";
-                        if (!empty($rawFormFields)) {
-                            echo "<p><strong>Sample field structure:</strong> " . print_r(array_slice($rawFormFields, 0, 1), true) . "</p>";
-                        }
-                        echo "</div>";
+                        // Also check for individual properties for backward compatibility
+                        $fallbackData = [
+                            'nama_lengkap' => $pendaftar->nama_lengkap ?? '',
+                            'nim' => $pendaftar->nim ?? '',
+                            'email' => $pendaftar->email ?? '',
+                            'no_hp' => $pendaftar->no_hp ?? '',
+                            'fakultas' => $pendaftar->fakultas ?? '',
+                            'jurusan' => $pendaftar->jurusan ?? '',
+                            'semester' => $pendaftar->semester ?? '',
+                            'ipk' => $pendaftar->ipk ?? '',
+                            'alasan_mendaftar' => $pendaftar->alasan_mendaftar ?? '',
+                        ];
 
                         // Merge current form data with fallback data
-                        $existingData = $currentFormData;
+                        $existingData = array_merge($fallbackData, $currentFormData);
                     @endphp
 
                     {{-- Render Dynamic Form Fields by Position --}}
-                    @if($rawFormFields && is_array($rawFormFields) && count($rawFormFields) > 0)
+                    @if($pendaftar->beasiswa->form_fields && is_array($pendaftar->beasiswa->form_fields) && count($pendaftar->beasiswa->form_fields) > 0)
                         @foreach(['personal', 'academic', 'additional'] as $position)
                             @php
-                                $positionFields = collect($rawFormFields)->where('position', $position);
+                                $positionFields = collect($pendaftar->beasiswa->form_fields)->where('position', $position);
                                 $positionTitles = [
                                     'personal' => 'Data Personal',
                                     'academic' => 'Data Akademik', 
@@ -389,8 +304,6 @@
                                     'academic' => 'fas fa-graduation-cap',
                                     'additional' => 'fas fa-info-circle'
                                 ];
-                                
-                                echo "<div class='debug-info'><p><strong>Position '$position' fields:</strong> " . $positionFields->count() . "</p></div>";
                             @endphp
                             
                             @if($positionFields->count() > 0)
@@ -404,11 +317,7 @@
                                     <div class="bg-white rounded-xl p-8 shadow-sm border border-orange-100">
                                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                                             @foreach($positionFields as $fieldIndex => $field)
-                                                @php
-                                                    echo "<div class='debug-info'><p><strong>Processing field " . $fieldIndex . ":</strong> " . print_r($field, true) . "</p></div>";
-                                                @endphp
-                                                
-                                                @if(is_array($field) && isset($field['key']))
+                                                @if(is_array($field))
                                                     @php
                                                         $fieldId = ($field['key'] ?? 'field') . '_' . $position . '_' . $fieldIndex;
                                                         $fieldName = $field['key'] ?? '';
@@ -453,9 +362,9 @@
                                                                         <option value="">{{ $field['placeholder'] ?? '-- Pilih --' }}</option>
                                                                         @if(isset($field['options']) && is_array($field['options']))
                                                                             @foreach($field['options'] as $option)
-                                                                                @if(is_array($option) && isset($option['value']))
-                                                                                    <option value="{{ $option['value'] }}" {{ $currentValue == $option['value'] ? 'selected' : '' }}>
-                                                                                        {{ $option['label'] ?? $option['value'] }}
+                                                                                @if(is_array($option))
+                                                                                    <option value="{{ $option['value'] ?? '' }}" {{ $currentValue == ($option['value'] ?? '') ? 'selected' : '' }}>
+                                                                                        {{ $option['label'] ?? '' }}
                                                                                     </option>
                                                                                 @endif
                                                                             @endforeach
@@ -471,23 +380,23 @@
                                                                     <div class="radio-group">
                                                                         @if(isset($field['options']) && is_array($field['options']))
                                                                             @foreach($field['options'] as $optionIndex => $option)
-                                                                                @if(is_array($option) && isset($option['value']))
+                                                                                @if(is_array($option))
                                                                                     @php
                                                                                         $radioId = $fieldId . '_option_' . $optionIndex;
-                                                                                        $isChecked = $currentValue == $option['value'];
+                                                                                        $isChecked = $currentValue == ($option['value'] ?? '');
                                                                                     @endphp
-                                                                                    <div class="radio-option {{ $isChecked ? 'selected' : '' }}" data-value="{{ $option['value'] }}">
+                                                                                    <div class="radio-option {{ $isChecked ? 'selected' : '' }}" data-value="{{ $option['value'] ?? '' }}">
                                                                                         <input 
                                                                                             type="radio" 
                                                                                             id="{{ $radioId }}"
                                                                                             name="{{ $fieldName }}" 
-                                                                                            value="{{ $option['value'] }}"
+                                                                                            value="{{ $option['value'] ?? '' }}"
                                                                                             {{ $isChecked ? 'checked' : '' }}
                                                                                             {{ ($field['required'] ?? false) ? 'required' : '' }}
                                                                                             {{ $isReadonly ? 'disabled' : '' }}
                                                                                             onchange="updateRadioSelection('{{ $fieldName }}', this)">
                                                                                         <label for="{{ $radioId }}" class="cursor-pointer flex-grow">
-                                                                                            <span>{{ $option['label'] ?? $option['value'] }}</span>
+                                                                                            <span>{{ $option['label'] ?? '' }}</span>
                                                                                         </label>
                                                                                     </div>
                                                                                 @endif
@@ -503,26 +412,26 @@
                                                                 @case('checkbox')
                                                                     <div class="checkbox-group">
                                                                         @php
-                                                                            $currentCheckboxValues = is_array($currentValue) ? $currentValue : (is_string($currentValue) && $currentValue ? explode(',', $currentValue) : []);
+                                                                            $currentCheckboxValues = is_array($currentValue) ? $currentValue : (is_string($currentValue) ? explode(',', $currentValue) : []);
                                                                         @endphp
                                                                         @if(isset($field['options']) && is_array($field['options']))
                                                                             @foreach($field['options'] as $optionIndex => $option)
-                                                                                @if(is_array($option) && isset($option['value']))
+                                                                                @if(is_array($option))
                                                                                     @php
                                                                                         $checkboxId = $fieldId . '_option_' . $optionIndex;
-                                                                                        $isChecked = in_array($option['value'], $currentCheckboxValues);
+                                                                                        $isChecked = in_array($option['value'] ?? '', $currentCheckboxValues);
                                                                                     @endphp
-                                                                                    <div class="checkbox-option {{ $isChecked ? 'selected' : '' }}" data-value="{{ $option['value'] }}">
+                                                                                    <div class="checkbox-option {{ $isChecked ? 'selected' : '' }}" data-value="{{ $option['value'] ?? '' }}">
                                                                                         <input 
                                                                                             type="checkbox" 
                                                                                             id="{{ $checkboxId }}"
                                                                                             name="{{ $fieldName }}[]" 
-                                                                                            value="{{ $option['value'] }}"
+                                                                                            value="{{ $option['value'] ?? '' }}"
                                                                                             {{ $isChecked ? 'checked' : '' }}
                                                                                             {{ $isReadonly ? 'disabled' : '' }}
                                                                                             onchange="updateCheckboxSelection(this)">
                                                                                         <label for="{{ $checkboxId }}" class="cursor-pointer flex-grow">
-                                                                                            <span>{{ $option['label'] ?? $option['value'] }}</span>
+                                                                                            <span>{{ $option['label'] ?? '' }}</span>
                                                                                         </label>
                                                                                     </div>
                                                                                 @endif
@@ -547,11 +456,11 @@
                                                                         value="{{ $currentValue }}"
                                                                         {{ ($field['required'] ?? false) ? 'required' : '' }}
                                                                         {{ $isReadonly ? 'readonly' : '' }}
-                                                                        @if($fieldType === 'number' && strpos($fieldName, 'ipk') !== false)
+                                                                        @if($fieldType === 'number' && $fieldName === 'ipk')
                                                                             step="0.01" min="0" max="4"
-                                                                        @elseif($fieldType === 'number' && strpos($fieldName, 'semester') !== false)
+                                                                        @elseif($fieldType === 'number' && $fieldName === 'semester')
                                                                             min="1" max="14"
-                                                                        @elseif(strpos($fieldName, 'no_hp') !== false || strpos($fieldName, 'phone') !== false)
+                                                                        @elseif($fieldName === 'no_hp')
                                                                             pattern="[0-9]{10,13}"
                                                                         @endif>
                                                                     @if($isReadonly)
@@ -567,10 +476,6 @@
                                                             @enderror
                                                         </div>
                                                     @endif
-                                                @else
-                                                    <div class="debug-info">
-                                                        <p><strong>SKIPPED FIELD (not array or no key):</strong> {{ print_r($field, true) }}</p>
-                                                    </div>
                                                 @endif
                                             @endforeach
                                         </div>
@@ -579,15 +484,71 @@
                             @endif
                         @endforeach
                     @else
-                        <div class="bg-yellow-50 border border-yellow-300 rounded-lg p-6 text-center">
-                            <i class="fas fa-exclamation-triangle text-yellow-600 text-2xl mb-2"></i>
-                            <h4 class="text-yellow-800 font-semibold mb-2">Form Fields Tidak Ditemukan</h4>
-                            <p class="text-yellow-700">Tidak ada form fields yang ditemukan untuk beasiswa ini.</p>
-                            <div class="debug-info mt-4">
-                                <p><strong>rawFormFields empty or invalid:</strong></p>
-                                <p>Type: {{ gettype($rawFormFields) }}</p>
-                                <p>Count: {{ is_array($rawFormFields) ? count($rawFormFields) : 'Not Array' }}</p>
-                                <p>Content: {{ print_r($rawFormFields, true) }}</p>
+                        {{-- Fallback form for older beasiswa without dynamic fields --}}
+                        <div class="bg-amber-50 rounded-xl p-6 mb-6 border-l-4 border-orange-500">
+                            <h6 class="text-lg font-bold text-orange-800 mb-6">
+                                <i class="fas fa-user text-orange-600 mr-2"></i>Data Personal
+                            </h6>
+                            <div class="bg-white rounded-xl p-8 shadow-sm">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label class="form-label" for="nama_lengkap">
+                                            <i class="fas fa-user text-orange-500 mr-2"></i>Nama Lengkap <span class="text-red-500">*</span>
+                                        </label>
+                                        <input type="text" id="nama_lengkap" name="nama_lengkap"
+                                            value="{{ old('nama_lengkap', $pendaftar->nama_lengkap) }}"
+                                            class="form-input @error('nama_lengkap') error @enderror"
+                                            required>
+                                        @error('nama_lengkap')
+                                            <div class="error-message">
+                                                <i class="fas fa-exclamation-circle mr-1"></i>
+                                                {{ $message }}
+                                            </div>
+                                        @enderror
+                                    </div>
+
+                                    <div>
+                                        <label class="form-label" for="nim">
+                                            <i class="fas fa-id-card text-orange-500 mr-2"></i>NIM <span class="text-red-500">*</span>
+                                        </label>
+                                        <input type="number" id="nim" name="nim"
+                                            value="{{ old('nim', $pendaftar->nim) }}"
+                                            class="form-input @error('nim') error @enderror"
+                                            required>
+                                        @error('nim')
+                                            <div class="error-message">
+                                                <i class="fas fa-exclamation-circle mr-1"></i>
+                                                {{ $message }}
+                                            </div>
+                                        @enderror
+                                    </div>
+
+                                    <div>
+                                        <label class="form-label" for="email">
+                                            <i class="fas fa-envelope text-orange-500 mr-2"></i>Email <span class="text-red-500">*</span>
+                                        </label>
+                                        <input type="email" id="email" name="email"
+                                            value="{{ old('email', $pendaftar->email) }}" readonly
+                                            class="form-input bg-amber-100 cursor-not-allowed">
+                                        <p class="text-xs text-orange-600 mt-1">Email tidak dapat diubah</p>
+                                    </div>
+
+                                    <div>
+                                        <label class="form-label" for="no_hp">
+                                            <i class="fas fa-phone text-orange-500 mr-2"></i>No. HP <span class="text-red-500">*</span>
+                                        </label>
+                                        <input type="tel" id="no_hp" name="no_hp"
+                                            value="{{ old('no_hp', $pendaftar->no_hp) }}"
+                                            class="form-input @error('no_hp') error @enderror"
+                                            pattern="[0-9]{10,13}" required>
+                                        @error('no_hp')
+                                            <div class="error-message">
+                                                <i class="fas fa-exclamation-circle mr-1"></i>
+                                                {{ $message }}
+                                            </div>
+                                        @enderror
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     @endif
@@ -629,10 +590,7 @@
                                                 $docId = 'upload_' . $docKey;
                                                 
                                                 // Get current file for this document
-                                                $currentFile = null;
-                                                if (method_exists($pendaftar, 'getDocument')) {
-                                                    $currentFile = $pendaftar->getDocument($docKey);
-                                                }
+                                                $currentFile = $pendaftar->getDocument($docKey);
                                             @endphp
                                             
                                             <div class="file-upload-card border-2 border-dashed border-orange-300 rounded-xl p-6 text-center"
@@ -644,8 +602,7 @@
                                                     id="{{ $docId }}" 
                                                     name="{{ $docKey }}"
                                                     class="file-input-hidden"
-                                                    accept="{{ collect($docFormats)->map(fn($ext) => '.' . strtolower($ext))->implode(',') }}"
-                                                    onchange="handleFileChange('{{ $docKey }}', this)">
+                                                    accept="{{ collect($docFormats)->map(fn($ext) => '.' . strtolower($ext))->implode(',') }}">
                                                 
                                                 <div class="file-upload-area">
                                                     <div class="file-icon text-{{ $docColor }}-500 text-4xl mb-4" id="icon_{{ $docKey }}">
@@ -848,7 +805,7 @@
             fileName: file.name
         });
         
-        if (allowedFormats.length > 0 && allowedFormats[0] && !allowedFormats.includes(fileExtension)) {
+        if (allowedFormats.length > 0 && !allowedFormats.includes(fileExtension)) {
             alert(`Format file tidak didukung.\nFormat yang diizinkan: ${allowedFormats.join(', ')}\nFile Anda: ${fileExtension}`);
             input.value = '';
             resetFileStatus(docKey);
@@ -1028,10 +985,6 @@
                     alert('Pop-up diblokir. Silakan aktifkan pop-up untuk melihat preview file.');
                 } else {
                     debugLog('PDF preview opened successfully');
-                    // Clean up the object URL after a delay
-                    setTimeout(() => {
-                        URL.revokeObjectURL(fileURL);
-                    }, 1000);
                 }
             } else {
                 alert(`Preview tidak tersedia untuk tipe file ${fileType}. File: ${file.name}`);
@@ -1094,43 +1047,45 @@
         }
     }
     
-    // Form validation function
+    // Enhanced form validation
     function validateForm() {
+        debugLog('Starting form validation...');
+        
         let isValid = true;
         const errors = [];
         
-        // Check required fields
-        const requiredFields = document.querySelectorAll('input[required], textarea[required], select[required]');
-        requiredFields.forEach(field => {
-            if (!field.value.trim()) {
-                isValid = false;
-                errors.push(`Field ${field.name || field.id} wajib diisi`);
-                field.classList.add('error');
-            } else {
-                field.classList.remove('error');
-            }
-        });
-        
-        // Validate file uploads if any
-        const fileInputs = document.querySelectorAll('input[type="file"]');
-        fileInputs.forEach(input => {
-            const isRequired = input.closest('.file-upload-card').querySelector('.text-red-500');
-            if (isRequired && input.files.length === 0) {
-                // Check if there's an existing file
-                const docKey = input.name;
-                const currentFileLink = document.querySelector(`a[href*="${docKey}"]`);
-                if (!currentFileLink) {
+        // Check required form fields
+        const requiredInputs = document.querySelectorAll('input[required], select[required], textarea[required]');
+        requiredInputs.forEach(input => {
+            if (input.type === 'checkbox' && input.name !== 'terms_agreement') {
+                // Handle checkbox groups
+                const checkboxGroup = document.querySelectorAll(`input[name="${input.name}"]`);
+                const hasChecked = Array.from(checkboxGroup).some(cb => cb.checked);
+                if (!hasChecked) {
                     isValid = false;
-                    errors.push(`Dokumen ${input.name} wajib diupload`);
+                    const label = input.closest('.form-group')?.querySelector('.form-label')?.textContent?.replace('*', '').trim();
+                    errors.push(`${label || input.name} minimal pilih satu.`);
+                }
+            } else if (input.type !== 'checkbox' && input.type !== 'file') {
+                if (!input.value.trim()) {
+                    isValid = false;
+                    const label = input.closest('.form-group')?.querySelector('.form-label')?.textContent?.replace('*', '').trim();
+                    errors.push(`${label || input.name} wajib diisi.`);
+                    input.classList.add('error');
                 }
             }
         });
         
-        if (!isValid && errors.length > 0) {
-            alert('Form belum lengkap:\n\n' + errors.join('\n'));
+        debugLog('Form validation completed', {
+            isValid: isValid,
+            errorCount: errors.length,
+            errors: errors
+        });
+        
+        if (!isValid) {
+            alert('Terdapat kesalahan pada form:\n\n• ' + errors.join('\n• '));
         }
         
-        debugLog('Form validation result', { isValid: isValid, errors: errors });
         return isValid;
     }
     
@@ -1153,6 +1108,82 @@
             if (container) {
                 container.classList.add('selected');
             }
+        });
+        
+        // Enhanced input validation and formatting
+        const inputs = document.querySelectorAll('.form-input, .form-textarea, .form-select');
+        inputs.forEach(input => {
+            input.addEventListener('focus', function() {
+                this.classList.add('focused');
+                this.classList.remove('error');
+            });
+            
+            input.addEventListener('blur', function() {
+                this.classList.remove('focused');
+                if (this.hasAttribute('required') && !this.value.trim()) {
+                    this.classList.add('error');
+                } else {
+                    this.classList.remove('error');
+                }
+            });
+            
+            input.addEventListener('input', function() {
+                this.classList.remove('error');
+            });
+        });
+        
+        // Phone number formatting
+        const phoneInput = document.querySelector('input[name="no_hp"]');
+        if (phoneInput) {
+            phoneInput.addEventListener('input', function() {
+                // Remove non-digits
+                this.value = this.value.replace(/\D/g, '');
+                // Limit to 13 characters
+                if (this.value.length > 13) {
+                    this.value = this.value.substring(0, 13);
+                }
+            });
+        }
+        
+        // NIM formatting
+        const nimInput = document.querySelector('input[name="nim"]');
+        if (nimInput) {
+            nimInput.addEventListener('input', function() {
+                // Remove non-digits
+                this.value = this.value.replace(/\D/g, '');
+                // Limit to 15 characters
+                if (this.value.length > 15) {
+                    this.value = this.value.substring(0, 15);
+                }
+            });
+        }
+        
+        // IPK formatting
+        const ipkInput = document.querySelector('input[name="ipk"]');
+        if (ipkInput) {
+            ipkInput.addEventListener('input', function() {
+                let value = parseFloat(this.value);
+                if (value > 4) {
+                    this.value = '4.00';
+                } else if (value < 0) {
+                    this.value = '0.00';
+                }
+            });
+            
+            ipkInput.addEventListener('blur', function() {
+                if (this.value && !isNaN(this.value)) {
+                    this.value = parseFloat(this.value).toFixed(2);
+                }
+            });
+        }
+        
+        // Add event listeners to file inputs
+        const fileInputs = document.querySelectorAll('input[type="file"]');
+        fileInputs.forEach(fileInput => {
+            const docKey = fileInput.name;
+            fileInput.addEventListener('change', function() {
+                handleFileChange(docKey, this);
+            });
         });
         
         // Form submission handling
