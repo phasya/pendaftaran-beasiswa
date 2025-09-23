@@ -19,6 +19,8 @@ Route::controller(HomeController::class)->group(function () {
     Route::get('/', 'index')->name('home');
     Route::get('/persyaratan', 'persyaratan')->name('persyaratan');
     Route::get('/status', 'checkStatus')->name('status');
+    // Di routes/web.php
+    Route::get('/admin/pendaftaran/{id}', [BeasiswaController::class, 'show'])->name('beasiswa.show');
 });
 
 // Authentication Routes

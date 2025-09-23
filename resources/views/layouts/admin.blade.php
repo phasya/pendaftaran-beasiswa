@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -32,7 +33,7 @@
     <style>
         .navbar {
             transition: all 0.3s ease-in-out;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             background: linear-gradient(135deg, #FF8A00, #FFD700, #FFBF00) !important;
         }
 
@@ -45,7 +46,7 @@
             background: rgba(255, 138, 0, 0.95) !important;
             backdrop-filter: blur(10px);
             -webkit-backdrop-filter: blur(10px);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
         }
 
         body.navbar-fixed {
@@ -59,7 +60,7 @@
         .navbar-brand {
             transition: transform 0.2s ease;
             font-weight: 600;
-            text-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
         }
 
         .navbar-brand:hover {
@@ -84,7 +85,7 @@
             background: linear-gradient(90deg, #fff, #FFF3A0);
             transition: all 0.3s ease;
             transform: translateX(-50%);
-            box-shadow: 0 0 8px rgba(255,255,255,0.8);
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.8);
         }
 
         .navbar-nav .nav-link:hover::after {
@@ -93,32 +94,36 @@
 
         .navbar-nav .nav-link:hover {
             color: #f8f9fa !important;
-            text-shadow: 0 0 10px rgba(255,255,255,0.5);
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
         }
 
         .dropdown-menu {
-            border: none;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
-            border-radius: 8px;
-            margin-top: 8px;
-            background: linear-gradient(135deg, #FFF8DC, #FFFACD);
+            border: none !important;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
+            border-radius: 8px !important;
+            margin-top: 8px !important;
+            background: linear-gradient(135deg, #FFF8DC, #FFFACD) !important;
+            min-width: 200px !important;
         }
 
         .dropdown-item {
-            transition: all 0.2s ease;
-            padding: 0.7rem 1.5rem;
-            color: #495057;
+            transition: all 0.2s ease !important;
+            padding: 0.7rem 1.5rem !important;
+            color: #495057 !important;
+            border: none !important;
+            background: none !important;
         }
 
-        .dropdown-item:hover {
-            background: linear-gradient(45deg, #FF8A00, #FFBF00);
-            color: white;
-            transform: translateX(5px);
+        .dropdown-item:hover,
+        .dropdown-item:focus {
+            background: linear-gradient(45deg, #FF8A00, #FFBF00) !important;
+            color: white !important;
+            transform: translateX(5px) !important;
         }
 
         .sidebar {
             background: linear-gradient(180deg, #FFF8DC 0%, #FFFACD 100%) !important;
-            box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+            box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
             min-height: calc(100vh - 56px);
             padding-top: 1rem;
         }
@@ -172,7 +177,7 @@
         .alert {
             border: none;
             border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
             margin-bottom: 1.5rem;
         }
 
@@ -206,7 +211,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0, 0, 0, 0.5);
             z-index: 1019;
             display: none;
         }
@@ -232,13 +237,13 @@
             }
 
             .navbar-toggler {
-                border: 2px solid rgba(255,255,255,0.3);
+                border: 2px solid rgba(255, 255, 255, 0.3);
                 border-radius: 6px;
                 color: white;
             }
 
             .navbar-toggler:focus {
-                box-shadow: 0 0 0 0.2rem rgba(255,255,255,0.25);
+                box-shadow: 0 0 0 0.2rem rgba(255, 255, 255, 0.25);
             }
 
             body.navbar-fixed {
@@ -250,13 +255,13 @@
             border: none;
             border-radius: 10px;
             background: white;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             transition: all 0.3s ease;
         }
 
         .card:hover {
             transform: translateY(-2px);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
         }
 
         .card-header {
@@ -280,13 +285,73 @@
         ::-webkit-scrollbar-thumb:hover {
             background: linear-gradient(180deg, #E67700, #FFD700);
         }
+
+        /* Custom dropdown styles for better control */
+        .custom-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .custom-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: linear-gradient(135deg, #FFF8DC, #FFFACD);
+            border-radius: 8px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            min-width: 200px;
+            z-index: 1050;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            margin-top: 8px;
+            padding: 0.5rem 0;
+        }
+
+        .custom-dropdown.show .custom-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .custom-dropdown-item {
+            display: block;
+            width: 100%;
+            padding: 0.7rem 1.5rem;
+            clear: both;
+            font-weight: 400;
+            color: #495057;
+            text-align: inherit;
+            text-decoration: none;
+            white-space: nowrap;
+            background-color: transparent;
+            border: 0;
+            transition: all 0.2s ease;
+        }
+
+        .custom-dropdown-item:hover,
+        .custom-dropdown-item:focus {
+            color: white;
+            background: linear-gradient(45deg, #FF8A00, #FFBF00);
+            transform: translateX(5px);
+        }
+
+        .custom-dropdown-divider {
+            height: 0;
+            margin: 0.5rem 0;
+            overflow: hidden;
+            border-top: 1px solid rgba(255, 138, 0, 0.2);
+        }
     </style>
 </head>
+
 <body class="bg-gradient-to-br from-cream-light to-cream-base">
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark" id="mainNavbar">
         <div class="container-fluid">
-            <a class="navbar-brand text-white font-bold hover:scale-105 transition-transform duration-200" href="{{ route('admin.dashboard') }}">
+            <a class="navbar-brand text-white font-bold hover:scale-105 transition-transform duration-200"
+                href="{{ route('admin.dashboard') }}">
                 <i class="fas fa-user-shield mr-2"></i> Admin Panel
             </a>
 
@@ -296,24 +361,25 @@
             </button>
 
             <div class="navbar-nav ms-auto">
-                <div class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle text-white font-medium hover:text-yellow-100 transition-colors duration-300" href="#" role="button" data-bs-toggle="dropdown">
+                <!-- Custom Dropdown -->
+                <div class="custom-dropdown">
+                    <a class="nav-link text-white font-medium hover:text-yellow-100 transition-colors duration-300 cursor-pointer"
+                        onclick="toggleDropdown()" id="userDropdown">
                         <i class="fas fa-user-circle mr-1"></i> {{ auth()->user()->name }}
+                        <i class="fas fa-chevron-down ml-1 transition-transform duration-200" id="dropdownChevron"></i>
                     </a>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item hover:bg-orange-primary hover:text-white transition-all duration-200" href="{{ route('home') }}">
+                    <div class="custom-dropdown-menu" id="dropdownMenu">
+                        <a class="custom-dropdown-item" href="{{ route('home') }}">
                             <i class="fas fa-home mr-2"></i> Lihat Website
-                        </a></li>
-                        <li><hr class="dropdown-divider border-orange-200"></li>
-                        <li>
-                            <form action="{{ route('logout') }}" method="POST" class="d-inline">
-                                @csrf
-                                <button type="submit" class="dropdown-item hover:bg-orange-primary hover:text-white transition-all duration-200 w-full text-left">
-                                    <i class="fas fa-sign-out-alt mr-2"></i> Logout
-                                </button>
-                            </form>
-                        </li>
-                    </ul>
+                        </a>
+                        <div class="custom-dropdown-divider"></div>
+                        <form action="{{ route('logout') }}" method="POST" class="d-inline">
+                            @csrf
+                            <button type="submit" class="custom-dropdown-item w-100 text-left border-0">
+                                <i class="fas fa-sign-out-alt mr-2"></i> Logout
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
@@ -326,19 +392,19 @@
                     <ul class="nav flex-column">
                         <li class="nav-item">
                             <a class="nav-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }} text-gray-700 hover:text-white hover:bg-gradient-to-r hover:from-orange-primary hover:to-yellow-warm transition-all duration-300"
-                               href="{{ route('admin.dashboard') }}">
+                                href="{{ route('admin.dashboard') }}">
                                 <i class="fas fa-tachometer-alt text-orange-primary"></i> Dashboard
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {{ request()->routeIs('admin.beasiswa.*') ? 'active' : '' }} text-gray-700 hover:text-white hover:bg-gradient-to-r hover:from-orange-primary hover:to-yellow-warm transition-all duration-300"
-                               href="{{ route('admin.beasiswa.index') }}">
+                                href="{{ route('admin.beasiswa.index') }}">
                                 <i class="fas fa-graduation-cap text-orange-primary"></i> Kelola Beasiswa
                             </a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {{ request()->routeIs('admin.pendaftar.*') ? 'active' : '' }} text-gray-700 hover:text-white hover:bg-gradient-to-r hover:from-orange-primary hover:to-yellow-warm transition-all duration-300"
-                               href="{{ route('admin.pendaftar.index') }}">
+                                href="{{ route('admin.pendaftar.index') }}">
                                 <i class="fas fa-users text-orange-primary"></i> Kelola Pendaftar
                             </a>
                         </li>
@@ -349,24 +415,28 @@
             <!-- Main content -->
             <main class="col-md-9 ms-sm-auto col-lg-10">
                 @if(session('success'))
-                    <div class="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl shadow-lg mb-6 p-4 flex items-center justify-between" role="alert">
+                    <div class="bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-xl shadow-lg mb-6 p-4 flex items-center justify-between"
+                        role="alert">
                         <div class="flex items-center">
                             <i class="fas fa-check-circle mr-3"></i>
                             <span>{{ session('success') }}</span>
                         </div>
-                        <button type="button" class="text-white hover:text-green-100 transition-colors" data-bs-dismiss="alert">
+                        <button type="button" class="text-white hover:text-green-100 transition-colors"
+                            onclick="this.parentElement.style.display='none'">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
                 @endif
 
                 @if(session('error'))
-                    <div class="bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-xl shadow-lg mb-6 p-4 flex items-center justify-between" role="alert">
+                    <div class="bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-xl shadow-lg mb-6 p-4 flex items-center justify-between"
+                        role="alert">
                         <div class="flex items-center">
                             <i class="fas fa-exclamation-triangle mr-3"></i>
                             <span>{{ session('error') }}</span>
                         </div>
-                        <button type="button" class="text-white hover:text-red-100 transition-colors" data-bs-dismiss="alert">
+                        <button type="button" class="text-white hover:text-red-100 transition-colors"
+                            onclick="this.parentElement.style.display='none'">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
@@ -379,10 +449,12 @@
 
     <div class="sidebar-overlay d-md-none" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
+        // Navbar scroll functionality
+        document.addEventListener('DOMContentLoaded', function () {
             const navbar = document.getElementById('mainNavbar');
             const body = document.body;
             let lastScrollTop = 0;
@@ -413,6 +485,7 @@
             window.addEventListener('scroll', requestTick);
         });
 
+        // Sidebar toggle functionality
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             const overlay = document.getElementById('sidebarOverlay');
@@ -426,7 +499,28 @@
             }
         }
 
-        document.addEventListener('click', function(e) {
+        // Custom dropdown functionality
+        function toggleDropdown() {
+            const dropdown = document.querySelector('.custom-dropdown');
+            const chevron = document.getElementById('dropdownChevron');
+
+            dropdown.classList.toggle('show');
+            chevron.style.transform = dropdown.classList.contains('show') ? 'rotate(180deg)' : 'rotate(0deg)';
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function (e) {
+            const dropdown = document.querySelector('.custom-dropdown');
+            const dropdownToggle = document.getElementById('userDropdown');
+
+            if (!dropdown.contains(e.target)) {
+                dropdown.classList.remove('show');
+                document.getElementById('dropdownChevron').style.transform = 'rotate(0deg)';
+            }
+        });
+
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('click', function (e) {
             const sidebar = document.getElementById('sidebar');
             const toggleBtn = document.querySelector('.navbar-toggler');
 
@@ -437,8 +531,31 @@
                 toggleSidebar();
             }
         });
+
+        // Prevent dropdown from closing when clicking inside
+        document.getElementById('dropdownMenu').addEventListener('click', function (e) {
+            // Allow form submission and links to work normally
+            if (e.target.tagName === 'A' || e.target.tagName === 'BUTTON') {
+                return;
+            }
+            e.stopPropagation();
+        });
+
+        // Enhanced keyboard navigation
+        document.addEventListener('keydown', function (e) {
+            // Close dropdown with Escape key
+            if (e.key === 'Escape') {
+                const dropdown = document.querySelector('.custom-dropdown');
+                if (dropdown.classList.contains('show')) {
+                    dropdown.classList.remove('show');
+                    document.getElementById('dropdownChevron').style.transform = 'rotate(0deg)';
+                    document.getElementById('userDropdown').focus();
+                }
+            }
+        });
     </script>
 
     @yield('scripts')
 </body>
+
 </html>

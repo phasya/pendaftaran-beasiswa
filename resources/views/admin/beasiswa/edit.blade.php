@@ -228,7 +228,7 @@
                                             <span class="text-danger">*</span>
                                         </label>
                                         <div>
-                                            
+
                                             <button type="button" class="btn btn-sm btn-outline-primary" id="addFieldBtn">
                                                 <i class="fas fa-plus me-2"></i>Tambah Field
                                             </button>
@@ -261,7 +261,7 @@
                                             <span class="text-danger">*</span>
                                         </label>
                                         <div>
-                                            
+
                                             <button type="button" class="btn btn-sm btn-outline-primary"
                                                 id="addDocumentBtn">
                                                 <i class="fas fa-plus me-2"></i>Tambah Dokumen
@@ -645,11 +645,13 @@
             const formFieldsContainer = document.getElementById('formFieldsContainer');
             const formFieldsEmpty = document.getElementById('formFieldsEmpty');
             const addFieldBtn = document.getElementById('addFieldBtn');
+            // Tambahkan tombol load default jika ada
             const loadDefaultFieldsBtn = document.getElementById('loadDefaultFieldsBtn');
 
             const documentsContainer = document.getElementById('documentsContainer');
             const documentsEmpty = document.getElementById('documentsEmpty');
             const addDocumentBtn = document.getElementById('addDocumentBtn');
+            // Tambahkan tombol load default dokumen jika ada
             const loadDefaultDocsBtn = document.getElementById('loadDefaultDocsBtn');
 
             const resetFormBtn = document.getElementById('resetFormBtn');
@@ -658,6 +660,18 @@
             // Load existing data from server-side
             const existingFormFields = @json($beasiswa->form_fields ?? []);
             const existingDocuments = @json($beasiswa->required_documents ?? []);
+
+            // Utility: Set value for date input if exists
+            function setDateInputValue(id, value) {
+                const input = document.getElementById(id);
+                if (input && value) {
+                    input.value = value;
+                }
+            }
+
+            // Set tanggal_buka dan tanggal_tutup jika ada
+            setDateInputValue('tanggal_buka', '{{ old('tanggal_buka', \Carbon\Carbon::parse($beasiswa->tanggal_buka)->format('Y-m-d')) }}');
+            setDateInputValue('tanggal_tutup', '{{ old('tanggal_tutup', \Carbon\Carbon::parse($beasiswa->tanggal_tutup)->format('Y-m-d')) }}');
 
             // Initialize data arrays
             if (existingFormFields && Array.isArray(existingFormFields) && existingFormFields.length > 0) {
@@ -853,12 +867,12 @@
                     const optionDiv = document.createElement('div');
                     optionDiv.className = 'input-group mb-2';
                     optionDiv.innerHTML = `
-                    <input type="text" class="form-control option-value" placeholder="Nilai opsi" value="${value}">
-                    <input type="text" class="form-control option-label" placeholder="Label opsi" value="${label}">
-                    <button type="button" class="btn btn-outline-danger remove-option-btn">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                `;
+                        <input type="text" class="form-control option-value" placeholder="Nilai opsi" value="${value}">
+                        <input type="text" class="form-control option-label" placeholder="Label opsi" value="${label}">
+                        <button type="button" class="btn btn-outline-danger remove-option-btn">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    `;
 
                     optionsContainer.appendChild(optionDiv);
 
@@ -940,12 +954,12 @@
                         const optionDiv = document.createElement('div');
                         optionDiv.className = 'input-group mb-2';
                         optionDiv.innerHTML = `
-                        <input type="text" class="form-control option-value" placeholder="Nilai opsi" value="${opt.value || ''}">
-                        <input type="text" class="form-control option-label" placeholder="Label opsi" value="${opt.label || ''}">
-                        <button type="button" class="btn btn-outline-danger remove-option-btn">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    `;
+                            <input type="text" class="form-control option-value" placeholder="Nilai opsi" value="${opt.value || ''}">
+                            <input type="text" class="form-control option-label" placeholder="Label opsi" value="${opt.label || ''}">
+                            <button type="button" class="btn btn-outline-danger remove-option-btn">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        `;
                         optionsContainer.appendChild(optionDiv);
 
                         // Add event listeners for options
@@ -1238,12 +1252,12 @@
 
             // Event bindings
             addFieldBtn.addEventListener('click', () => addFormField());
-            loadDefaultFieldsBtn.addEventListener('click', loadDefaultFormFields);
+            if (loadDefaultFieldsBtn) loadDefaultFieldsBtn.addEventListener('click', loadDefaultFormFields);
             addDocumentBtn.addEventListener('click', () => addDocumentItem());
-            loadDefaultDocsBtn.addEventListener('click', loadDefaultDocuments);
+            if (loadDefaultDocsBtn) loadDefaultDocsBtn.addEventListener('click', loadDefaultDocuments);
             resetFormBtn.addEventListener('click', resetForm);
 
-            // Form submission - FIXED VERSION
+            // Form submission
             beasiswaForm.addEventListener('submit', function (e) {
                 e.preventDefault();
 

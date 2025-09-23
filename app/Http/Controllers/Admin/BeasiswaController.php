@@ -177,10 +177,14 @@ class BeasiswaController extends Controller
         }
     }
 
+    
+
     public function show(Beasiswa $beasiswa)
     {
         return view('admin.beasiswa.show', compact('beasiswa'));
     }
+
+    
 
     public function edit(Beasiswa $beasiswa)
     {

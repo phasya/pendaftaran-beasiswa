@@ -8,6 +8,8 @@ use App\Models\Beasiswa;
 
 class BeasiswaController extends Controller
 {
+
+    
     public function index()
     {
         $beasiswas = Beasiswa::withCount('pendaftars')->latest()->paginate(10);
