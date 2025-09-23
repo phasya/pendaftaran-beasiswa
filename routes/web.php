@@ -23,6 +23,19 @@ Route::controller(HomeController::class)->group(function () {
     Route::get('/admin/pendaftaran/{id}', [BeasiswaController::class, 'show'])->name('beasiswa.show');
 });
 
+// PDF route
+Route::get('/pdf/{filename}', function ($filename) {
+    $path = storage_path('app/public/pdf/' . $filename);
+
+    if (!file_exists($path)) {
+        abort(404, 'File not found.');
+    }
+
+    return response()->file($path, [
+        'Content-Type' => 'application/pdf',
+    ]);
+})->name('pdf.show');
+
 // Authentication Routes
 Route::controller(AuthController::class)->group(function () {
     Route::get('/login', 'showLogin')->name('login');
@@ -53,6 +66,8 @@ Route::middleware('auth')->group(function () {
     Route::controller(HomeController::class)->group(function () {
         Route::get('/resubmit/{pendaftar}', 'editForResubmit')->name('pendaftar.resubmit');
         Route::put('/resubmit/{pendaftar}', 'resubmit')->name('pendaftar.resubmit.store');
+        Route::get('/pendaftar/{pendaftar}/resubmit', [PendaftarController::class, 'resubmit'])->name('pendaftar.resubmit');
+        Route::put('/pendaftar/{pendaftar}/resubmit', [PendaftarController::class, 'resubmitStore'])->name('pendaftar.resubmit.store');
     });
 });
 

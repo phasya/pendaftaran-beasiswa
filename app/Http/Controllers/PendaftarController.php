@@ -13,69 +13,69 @@ use Exception;
 
 class PendaftarController extends Controller
 {
-    public function __construct()
+    /**
+     * Show resubmit form for rejected application
+     */
+    public function resubmit(Pendaftar $pendaftar)
     {
-        $this->middleware('auth');
-    }
-
-    public function create(Beasiswa $beasiswa)
-    {
-        if (!$beasiswa->isActive()) {
-            return redirect()->route('home')
-                ->with('error', 'Pendaftaran beasiswa sudah ditutup atau tidak aktif.');
+        // Pastikan user hanya bisa resubmit aplikasi mereka sendiri
+        if ($pendaftar->email !== Auth::user()->email) {
+            abort(403, 'Akses ditolak: Anda hanya dapat mengedit aplikasi Anda sendiri.');
         }
 
-        // Cek berdasarkan email user yang login - hanya cek yang statusnya pending atau diterima
-        $existingApplication = Pendaftar::where('email', Auth::user()->email)
-            ->whereIn('status', ['pending', 'diterima'])
-            ->first();
-
-        if ($existingApplication) {
-            $beasiswaTerdaftar = Beasiswa::find($existingApplication->beasiswa_id);
-            $statusText = $existingApplication->status == 'pending' ? 'sedang menunggu verifikasi' : 'telah diterima';
-
-            return redirect()->route('home')
-                ->with('error', 'Anda sudah terdaftar di beasiswa "' . $beasiswaTerdaftar->nama_beasiswa . '" dan ' . $statusText . '.');
+        // Pastikan aplikasi bisa di-resubmit
+        if ($pendaftar->status !== 'ditolak' || !$pendaftar->can_resubmit) {
+            return redirect()->route('status')
+                ->with('error', 'Aplikasi ini tidak dapat diajukan ulang.');
         }
 
-        return view('pendaftaran.create', compact('beasiswa'));
+        // Load beasiswa relationship
+        $pendaftar->load('beasiswa');
+
+        Log::info('Resubmit form accessed', [
+            'pendaftar_id' => $pendaftar->id,
+            'beasiswa_id' => $pendaftar->beasiswa_id,
+            'user_email' => Auth::user()->email,
+            'form_data_available' => !empty($pendaftar->form_data),
+            'beasiswa_form_fields_available' => !empty($pendaftar->beasiswa->form_fields)
+        ]);
+
+        return view('pendaftaran.resubmit', compact('pendaftar'));
     }
 
-    public function store(Request $request, Beasiswa $beasiswa)
+    /**
+     * Process resubmit form submission
+     */
+    public function resubmitStore(Request $request, Pendaftar $pendaftar)
     {
         try {
-            Log::info('Starting dynamic form submission', [
-                'beasiswa_id' => $beasiswa->id,
-                'user_email' => Auth::user()->email,
-                'form_fields_available' => is_array($beasiswa->form_fields) ? count($beasiswa->form_fields) : 0,
-                'documents_required' => is_array($beasiswa->required_documents) ? count($beasiswa->required_documents) : 0
+            Log::info('Starting resubmit form submission', [
+                'pendaftar_id' => $pendaftar->id,
+                'beasiswa_id' => $pendaftar->beasiswa_id,
+                'user_email' => Auth::user()->email
             ]);
 
-            if (!$beasiswa->isActive()) {
-                return redirect()->route('home')
-                    ->with('error', 'Pendaftaran beasiswa sudah ditutup atau tidak aktif.');
+            // Pastikan user hanya bisa resubmit aplikasi mereka sendiri
+            if ($pendaftar->email !== Auth::user()->email) {
+                abort(403, 'Akses ditolak: Anda hanya dapat mengedit aplikasi Anda sendiri.');
             }
 
-            // Cek apakah user sudah memiliki aplikasi aktif
-            $existingApplicationByEmail = Pendaftar::where('email', Auth::user()->email)
-                ->whereIn('status', ['pending', 'diterima'])
-                ->first();
-
-            if ($existingApplicationByEmail) {
-                return redirect()->route('home')
-                    ->with('error', 'Anda masih memiliki beasiswa yang aktif.');
+            // Pastikan aplikasi bisa di-resubmit
+            if ($pendaftar->status !== 'ditolak' || !$pendaftar->can_resubmit) {
+                return redirect()->route('status')
+                    ->with('error', 'Aplikasi ini tidak dapat diajukan ulang.');
             }
 
-            // Build validation rules
+            $beasiswa = $pendaftar->beasiswa;
+
+            if (!$beasiswa) {
+                return redirect()->route('status')
+                    ->with('error', 'Beasiswa tidak ditemukan.');
+            }
+
+            // Build validation rules (sama seperti store method)
             $rules = [];
             $messages = [];
-
-            // Terms agreement validation
-            if ($request->has('terms_agreement')) {
-                $rules['terms_agreement'] = 'required|accepted';
-                $messages['terms_agreement.required'] = 'Anda harus menyetujui syarat dan ketentuan.';
-                $messages['terms_agreement.accepted'] = 'Anda harus menyetujui syarat dan ketentuan.';
-            }
 
             // Dynamic form field validation
             if ($beasiswa->form_fields && is_array($beasiswa->form_fields)) {
@@ -112,7 +112,7 @@ class PendaftarController extends Controller
                         $fieldRules[] = 'nullable';
                     }
 
-                    // Type-specific validation
+                    // Type-specific validation (sama seperti store method)
                     switch ($fieldType) {
                         case 'email':
                             $fieldRules[] = 'email';
@@ -140,13 +140,18 @@ class PendaftarController extends Controller
                             $fieldRules[] = 'string';
                             $fieldRules[] = 'max:255';
 
-                            // Special validation untuk NIM
+                            // Special validation untuk NIM (skip jika sama dengan yang sudah ada)
                             if ($fieldKey === 'nim') {
                                 if ($request->filled($fieldKey)) {
-                                    // Cek apakah NIM sudah dipakai di aplikasi yang masih aktif
-                                    if (Pendaftar::isNimTaken($request->input($fieldKey), Auth::user()->email)) {
-                                        $messages[$fieldKey . '.unique'] = 'NIM ini sudah digunakan pendaftar lain yang masih aktif.';
-                                        $fieldRules[] = Rule::unique('non_existent_table', 'field'); // Force validation to fail
+                                    $currentNim = $pendaftar->form_data['nim'] ?? '';
+                                    $newNim = $request->input($fieldKey);
+
+                                    // Hanya cek jika NIM berubah
+                                    if ($newNim !== $currentNim) {
+                                        if (Pendaftar::isNimTaken($newNim, Auth::user()->email)) {
+                                            $messages[$fieldKey . '.unique'] = 'NIM ini sudah digunakan pendaftar lain yang masih aktif.';
+                                            $fieldRules[] = Rule::unique('non_existent_table', 'field'); // Force validation to fail
+                                        }
                                     }
                                 }
                             }
@@ -187,17 +192,10 @@ class PendaftarController extends Controller
                     if (!empty($fieldRules)) {
                         $rules[$fieldKey] = $fieldRules;
                     }
-
-                    Log::info('Added validation rule for dynamic field', [
-                        'field' => $fieldKey,
-                        'rules' => $fieldRules,
-                        'type' => $fieldType,
-                        'required' => $isRequired
-                    ]);
                 }
             }
 
-            // Document validation
+            // Document validation (optional untuk resubmit)
             if ($beasiswa->required_documents && is_array($beasiswa->required_documents)) {
                 foreach ($beasiswa->required_documents as $document) {
                     if (!is_array($document)) {
@@ -206,64 +204,57 @@ class PendaftarController extends Controller
 
                     $docKey = $document['key'] ?? '';
                     $docName = $document['name'] ?? 'Dokumen';
-                    $isRequired = $document['required'] ?? true;
 
                     if (empty($docKey)) {
                         continue;
                     }
 
-                    $docRules = [];
+                    // Untuk resubmit, file upload optional (hanya jika ada file baru)
+                    if ($request->hasFile($docKey)) {
+                        $docRules = ['file'];
 
-                    if ($isRequired) {
-                        $docRules[] = 'required';
-                        $messages[$docKey . '.required'] = 'Dokumen ' . $docName . ' wajib diupload.';
-                    } else {
-                        $docRules[] = 'nullable';
-                    }
+                        // File size validation
+                        $maxSizeKB = ($document['max_size'] ?? 5) * 1024;
+                        $docRules[] = 'max:' . $maxSizeKB;
+                        $messages[$docKey . '.max'] = 'Ukuran file ' . $docName . ' maksimal ' . ($document['max_size'] ?? 5) . 'MB.';
 
-                    $docRules[] = 'file';
-
-                    // File size validation
-                    $maxSizeKB = ($document['max_size'] ?? 5) * 1024;
-                    $docRules[] = 'max:' . $maxSizeKB;
-                    $messages[$docKey . '.max'] = 'Ukuran file ' . $docName . ' maksimal ' . ($document['max_size'] ?? 5) . 'MB.';
-
-                    // File type validation
-                    if (!empty($document['formats']) && is_array($document['formats'])) {
-                        $allowedMimes = [];
-                        foreach ($document['formats'] as $format) {
-                            $format = strtolower(trim($format));
-                            switch ($format) {
-                                case 'pdf':
-                                    $allowedMimes[] = 'pdf';
-                                    break;
-                                case 'jpg':
-                                case 'jpeg':
-                                    $allowedMimes[] = 'jpg';
-                                    $allowedMimes[] = 'jpeg';
-                                    break;
-                                case 'png':
-                                    $allowedMimes[] = 'png';
-                                    break;
-                                case 'doc':
-                                    $allowedMimes[] = 'doc';
-                                    break;
-                                case 'docx':
-                                    $allowedMimes[] = 'docx';
-                                    break;
+                        // File type validation
+                        if (!empty($document['formats']) && is_array($document['formats'])) {
+                            $allowedMimes = [];
+                            foreach ($document['formats'] as $format) {
+                                $format = strtolower(trim($format));
+                                switch ($format) {
+                                    case 'pdf':
+                                        $allowedMimes[] = 'pdf';
+                                        break;
+                                    case 'jpg':
+                                    case 'jpeg':
+                                        $allowedMimes[] = 'jpg';
+                                        $allowedMimes[] = 'jpeg';
+                                        break;
+                                    case 'png':
+                                        $allowedMimes[] = 'png';
+                                        break;
+                                    case 'doc':
+                                        $allowedMimes[] = 'doc';
+                                        break;
+                                    case 'docx':
+                                        $allowedMimes[] = 'docx';
+                                        break;
+                                }
+                            }
+                            if (!empty($allowedMimes)) {
+                                $docRules[] = 'mimes:' . implode(',', array_unique($allowedMimes));
+                                $messages[$docKey . '.mimes'] = 'Format file ' . $docName . ' harus: ' . implode(', ', $document['formats']);
                             }
                         }
-                        if (!empty($allowedMimes)) {
-                            $docRules[] = 'mimes:' . implode(',', array_unique($allowedMimes));
-                            $messages[$docKey . '.mimes'] = 'Format file ' . $docName . ' harus: ' . implode(', ', $document['formats']);
-                        }
-                    }
 
-                    $rules[$docKey] = $docRules;
+                        $rules[$docKey] = $docRules;
+                    }
                 }
             }
 
-            Log::info('Final validation rules for dynamic form', [
+            Log::info('Validation rules for resubmit', [
                 'rules_count' => count($rules),
                 'rules' => array_keys($rules)
             ]);
@@ -271,138 +262,108 @@ class PendaftarController extends Controller
             // Perform validation
             $validated = $request->validate($rules, $messages);
 
-            Log::info('Validation passed for dynamic form', [
+            Log::info('Resubmit validation passed', [
                 'validated_fields' => array_keys($validated)
             ]);
 
-            // Remove terms_agreement from data to be stored
-            unset($validated['terms_agreement']);
+            // Prepare updated form data
+            $currentFormData = $pendaftar->form_data ?? [];
+            $updatedFormData = $currentFormData;
 
-            // Separate form data from file uploads
-            $formData = [];
-            $fileKeys = [];
-
-            // Collect file upload keys
-            if ($beasiswa->required_documents && is_array($beasiswa->required_documents)) {
-                foreach ($beasiswa->required_documents as $document) {
-                    $docKey = $document['key'] ?? '';
-                    if (!empty($docKey)) {
-                        $fileKeys[] = $docKey;
-                    }
-                }
-            }
-
-            // Prepare form data (exclude file uploads)
+            // Update form data dengan input baru
             if ($beasiswa->form_fields && is_array($beasiswa->form_fields)) {
                 foreach ($beasiswa->form_fields as $field) {
                     $fieldKey = $field['key'] ?? '';
-                    if (!empty($fieldKey) && isset($validated[$fieldKey]) && !in_array($fieldKey, $fileKeys)) {
-                        $formData[$fieldKey] = $validated[$fieldKey];
+                    if (!empty($fieldKey) && array_key_exists($fieldKey, $validated)) {
+                        $updatedFormData[$fieldKey] = $validated[$fieldKey];
                     }
                 }
             }
 
-            Log::info('Form data prepared', [
-                'form_data_keys' => array_keys($formData),
-                'file_keys' => $fileKeys
-            ]);
+            // Handle file uploads (update dokumen jika ada yang baru)
+            $currentDocuments = $pendaftar->uploaded_documents ?? [];
+            $updatedDocuments = $currentDocuments;
 
-            // Handle file uploads
-            $uploadedDocuments = [];
             if ($beasiswa->required_documents && is_array($beasiswa->required_documents)) {
                 foreach ($beasiswa->required_documents as $document) {
                     $docKey = $document['key'] ?? '';
 
-                    if (empty($docKey)) {
+                    if (empty($docKey) || !$request->hasFile($docKey)) {
                         continue;
                     }
 
-                    if ($request->hasFile($docKey)) {
-                        $file = $request->file($docKey);
+                    $file = $request->file($docKey);
 
-                        if ($file->isValid()) {
-                            try {
-                                $extension = $file->getClientOriginalExtension();
-                                $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-                                $safeName = preg_replace('/[^a-zA-Z0-9_-]/', '_', $originalName);
-                                $fileName = time() . '_' . $docKey . '_' . $safeName . '.' . $extension;
-
-                                // Ensure directory exists
-                                if (!Storage::disk('public')->exists('documents')) {
-                                    Storage::disk('public')->makeDirectory('documents');
+                    if ($file->isValid()) {
+                        try {
+                            // Hapus file lama jika ada
+                            if (isset($currentDocuments[$docKey])) {
+                                $oldFilePath = 'documents/' . $currentDocuments[$docKey];
+                                if (Storage::disk('public')->exists($oldFilePath)) {
+                                    Storage::disk('public')->delete($oldFilePath);
+                                    Log::info('Old file deleted', ['file' => $oldFilePath]);
                                 }
-
-                                $path = $file->storeAs('documents', $fileName, 'public');
-                                $uploadedDocuments[$docKey] = $fileName;
-
-                                Log::info('File uploaded successfully for dynamic form', [
-                                    'key' => $docKey,
-                                    'original_name' => $file->getClientOriginalName(),
-                                    'stored_name' => $fileName,
-                                    'path' => $path,
-                                    'size' => $file->getSize()
-                                ]);
-                            } catch (Exception $e) {
-                                Log::error('File upload failed for dynamic form', [
-                                    'key' => $docKey,
-                                    'error' => $e->getMessage(),
-                                    'trace' => $e->getTraceAsString()
-                                ]);
-
-                                return redirect()->back()
-                                    ->withInput()
-                                    ->with('error', 'Gagal mengupload file ' . ($document['name'] ?? $docKey) . '. Error: ' . $e->getMessage());
                             }
-                        } else {
-                            Log::error('Invalid file upload for dynamic form', [
+
+                            $extension = $file->getClientOriginalExtension();
+                            $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+                            $safeName = preg_replace('/[^a-zA-Z0-9_-]/', '_', $originalName);
+                            $fileName = time() . '_' . $docKey . '_' . $safeName . '.' . $extension;
+
+                            // Ensure directory exists
+                            if (!Storage::disk('public')->exists('documents')) {
+                                Storage::disk('public')->makeDirectory('documents');
+                            }
+
+                            $path = $file->storeAs('documents', $fileName, 'public');
+                            $updatedDocuments[$docKey] = $fileName;
+
+                            Log::info('File uploaded successfully for resubmit', [
                                 'key' => $docKey,
-                                'error' => $file->getErrorMessage()
+                                'original_name' => $file->getClientOriginalName(),
+                                'stored_name' => $fileName,
+                                'path' => $path,
+                                'size' => $file->getSize()
+                            ]);
+                        } catch (Exception $e) {
+                            Log::error('File upload failed for resubmit', [
+                                'key' => $docKey,
+                                'error' => $e->getMessage()
                             ]);
 
                             return redirect()->back()
                                 ->withInput()
-                                ->with('error', 'File ' . ($document['name'] ?? $docKey) . ' tidak valid: ' . $file->getErrorMessage());
+                                ->with('error', 'Gagal mengupload file ' . ($document['name'] ?? $docKey) . '. Error: ' . $e->getMessage());
                         }
                     }
                 }
             }
 
-            // Create pendaftar record with JSON data
-            $pendaftarData = [
-                'beasiswa_id' => $beasiswa->id,
-                'email' => Auth::user()->email,
-                'form_data' => $formData, // Store all form data as JSON
-                'uploaded_documents' => $uploadedDocuments,
+            // Update pendaftar record
+            $pendaftar->update([
+                'form_data' => $updatedFormData,
+                'uploaded_documents' => $updatedDocuments,
                 'status' => 'pending',
-            ];
-
-            Log::info('Creating pendaftar with dynamic form data', [
-                'beasiswa_id' => $beasiswa->id,
-                'email' => Auth::user()->email,
-                'form_data_keys' => array_keys($formData),
-                'documents_count' => count($uploadedDocuments)
+                'rejection_reason' => null,
+                'rejection_date' => null,
+                'can_resubmit' => false,
+                'updated_at' => now()
             ]);
 
-            // Create the application
-            $pendaftar = Pendaftar::create($pendaftarData);
-
-            Log::info('Pendaftar created successfully with dynamic form', [
+            Log::info('Pendaftar resubmitted successfully', [
                 'id' => $pendaftar->id,
                 'beasiswa_id' => $pendaftar->beasiswa_id,
-                'email' => $pendaftar->email,
-                'form_data_stored' => !empty($pendaftar->form_data),
-                'documents_stored' => !empty($pendaftar->uploaded_documents)
+                'email' => $pendaftar->email
             ]);
 
-            return redirect()->route('home')
-                ->with('success', 'Pendaftaran beasiswa berhasil! Data Anda sedang dalam proses verifikasi.');
+            return redirect()->route('status')
+                ->with('success', 'Aplikasi berhasil diajukan ulang! Data Anda akan diverifikasi kembali.');
 
         } catch (\Illuminate\Validation\ValidationException $e) {
-            Log::error('Validation failed for dynamic form', [
+            Log::error('Resubmit validation failed', [
+                'pendaftar_id' => $pendaftar->id,
                 'errors' => $e->errors(),
-                'validator_messages' => $e->validator->messages()->toArray(),
-                'failed_rules' => $e->validator->failed(),
-                'input_data' => $request->except(['_token'])
+                'validator_messages' => $e->validator->messages()->toArray()
             ]);
 
             $firstError = collect($e->errors())->flatten()->first();
@@ -413,76 +374,17 @@ class PendaftarController extends Controller
                 ->with('error', 'Validasi gagal: ' . $firstError);
 
         } catch (Exception $e) {
-            Log::error('Unexpected error during dynamic form submission', [
+            Log::error('Unexpected error during resubmit', [
+                'pendaftar_id' => $pendaftar->id,
                 'message' => $e->getMessage(),
                 'line' => $e->getLine(),
                 'file' => $e->getFile(),
-                'trace' => $e->getTraceAsString(),
-                'request_data' => $request->except(['_token'])
+                'trace' => $e->getTraceAsString()
             ]);
 
             return redirect()->back()
                 ->withInput()
                 ->with('error', 'Terjadi kesalahan sistem: ' . $e->getMessage() . '. Silakan coba lagi atau hubungi administrator.');
         }
-    }
-
-    public function show(Pendaftar $pendaftar)
-    {
-        // Pastikan user hanya bisa melihat data mereka sendiri
-        if ($pendaftar->email !== Auth::user()->email) {
-            abort(403);
-        }
-
-        return view('pendaftar.show', compact('pendaftar'));
-    }
-
-    public function downloadDocument(Pendaftar $pendaftar, $documentKey)
-    {
-        // Pastikan user hanya bisa download dokumen mereka sendiri
-        if ($pendaftar->email !== Auth::user()->email) {
-            abort(403);
-        }
-
-        $documents = $pendaftar->uploaded_documents ?? [];
-
-        if (!isset($documents[$documentKey])) {
-            abort(404);
-        }
-
-        $filename = $documents[$documentKey];
-        $path = storage_path('app/public/documents/' . $filename);
-
-        if (!file_exists($path)) {
-            abort(404);
-        }
-
-        return response()->download($path);
-    }
-
-    /**
-     * Method untuk cek status NIM (updated untuk JSON storage)
-     */
-    public function checkNIMStatus($nim)
-    {
-        $applications = Pendaftar::whereJsonContains('form_data->nim', $nim)
-            ->with('beasiswa')
-            ->orderBy('created_at', 'desc')
-            ->get();
-
-        $activeApplication = $applications->whereIn('status', ['pending', 'diterima'])->first();
-        $rejectedApplications = $applications->where('status', 'ditolak');
-        $resubmittableApplications = $rejectedApplications->where('can_resubmit', true);
-
-        return response()->json([
-            'nim' => $nim,
-            'has_active_application' => !is_null($activeApplication),
-            'active_application' => $activeApplication,
-            'total_applications' => $applications->count(),
-            'rejected_applications_count' => $rejectedApplications->count(),
-            'resubmittable_applications_count' => $resubmittableApplications->count(),
-            'can_apply_new' => is_null($activeApplication),
-            'has_resubmittable' => $resubmittableApplications->isNotEmpty(),
-        ]);
     }
 }

@@ -797,4 +797,5 @@
                 }
             }
         </style>
+        
 @endsection
