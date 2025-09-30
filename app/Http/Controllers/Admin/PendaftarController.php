@@ -22,8 +22,8 @@ class PendaftarController extends Controller
     {
         // Load rejection history untuk ditampilkan ke admin
         $rejectionHistories = RejectionHistory::where('pendaftar_id', $pendaftar->id)
-                                            ->orderBy('rejected_at', 'desc')
-                                            ->get();
+            ->orderBy('rejected_at', 'desc')
+            ->get();
 
         return view('admin.pendaftaran.show', compact('pendaftar', 'rejectionHistories'));
     }
@@ -107,7 +107,7 @@ class PendaftarController extends Controller
 
         $pendaftar->delete();
         return redirect()->route('admin.pendaftar.index')
-                        ->with('success', 'Data pendaftar berhasil dihapus!');
+            ->with('success', 'Data pendaftar berhasil dihapus!');
     }
 
     /**
@@ -116,12 +116,12 @@ class PendaftarController extends Controller
     public function getRejectionHistory(Pendaftar $pendaftar)
     {
         $histories = RejectionHistory::where('pendaftar_id', $pendaftar->id)
-                                   ->orderBy('rejected_at', 'desc')
-                                   ->get();
+            ->orderBy('rejected_at', 'desc')
+            ->get();
 
         return response()->json([
             'success' => true,
-            'data' => $histories->map(function($history) {
+            'data' => $histories->map(function ($history) {
                 return [
                     'id' => $history->id,
                     'rejection_reason' => $history->rejection_reason,

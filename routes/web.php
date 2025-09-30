@@ -112,4 +112,5 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         }
         return "Beasiswa not found";
     })->name('fix-beasiswa-temp');
+    
 });
